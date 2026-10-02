@@ -11,7 +11,7 @@ from catalog_normalizer.result import (
     RowError,
 )
 
-from catalog_normalizer.normalizers import normalize_missing_value
+from catalog_normalizer.normalizers import normalize_field_value
 
 class Normalizer:
     def __init__(self, schema: type[ProductSchema] = ProductSchema):
@@ -91,8 +91,9 @@ class Normalizer:
         mappings: Mapping[str, str],
     ) -> dict[str, str | None]:
         return {
-            canonical_field: normalize_missing_value(
-                row.get(source_field)
+            canonical_field: normalize_field_value(
+                canonical_field,
+                row.get(source_field),
             )
             for source_field, canonical_field in mappings.items()
         }
