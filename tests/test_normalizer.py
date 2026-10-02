@@ -112,3 +112,37 @@ def test_price_with_currency_symbol_is_normalized(
     product = result.valid_records[0]
 
     assert product.price == Decimal("42.95")
+
+
+def test_price_with_currency_symbol_and_thousands_separator_is_normalized(
+    tmp_path: Path,
+) -> None:
+    csv_file = tmp_path / "products.csv"
+
+    csv_file.write_text(
+        (
+            'Item Code,Product Desc,Retail Price,Qty\n'
+            'MAG001,Magnesium Citrate,"$1,299.99",17\n'
+        ),
+        encoding="utf-8",
+    )
+
+    normalizer = Normalizer()
+
+    result = normalizer.process(
+        csv_file,
+        mappings={
+            "Item Code": "sku",
+            "Product Desc": "name",
+            "Retail Price": "price",
+            "Qty": "inventory",
+        },
+    )
+
+    assert result.summary is not None
+    assert result.summary.valid_rows == 1
+    assert result.summary.rejected_rows == 0
+
+    product = result.valid_records[0]
+
+    assert product.price == Decimal("1299.99")

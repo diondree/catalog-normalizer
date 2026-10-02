@@ -22,6 +22,8 @@ def normalize_price(value: str | None) -> str | None:
     if normalized.startswith("$"):
         normalized = normalized[1:].strip()
 
+    normalized = normalized.replace(",", "")
+
     return normalized
 
 
