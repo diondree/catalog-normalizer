@@ -1,8 +1,7 @@
 from decimal import Decimal
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
-
-from typing import Annotated
 
 RequiredString = Annotated[
     str,
@@ -16,6 +15,7 @@ NonNegativeInventory = Annotated[
     int,
     Field(ge=0),
 ]
+
 
 class ProductSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)

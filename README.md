@@ -50,6 +50,7 @@ The current implementation supports:
 - warnings for configured missing-value markers normalized to `None`
 - processing summaries distinguish valid, warned, and rejected rows
 - detected and unused CSV columns reported in processing summaries
+- automated formatting, linting, type checking, tests, and coverage reporting in CI
 
 ---
 
@@ -177,9 +178,7 @@ result.summary.detected_columns == (
     "Internal Notes",
 )
 
-result.summary.unused_columns == (
-    "Internal Notes",
-)
+result.summary.unused_columns == ("Internal Notes",)
 ```
 
 Unused columns do not cause the import to fail. They are reported so callers
@@ -403,6 +402,33 @@ with the number of accepted products.
 
 ---
 
+## Continuous Integration
+
+Every push and pull request runs the project quality gates through
+GitHub Actions.
+
+The CI pipeline currently verifies:
+
+- Ruff formatting
+- Ruff linting
+- Pyright type checking
+- pytest
+- test coverage reporting
+
+The same checks can be run locally:
+
+```bash
+uv run ruff format --check .
+uv run ruff check .
+uv run pyright
+uv run pytest --cov=catalog_normalizer --cov-report=term-missing
+```
+
+CI installs dependencies from the committed `uv.lock` file so dependency
+resolution remains reproducible.
+
+---
+
 ## Planned v0.1 Work
 
 Upcoming work includes:
@@ -414,8 +440,8 @@ Upcoming work includes:
 5. improved processing summaries
 6. larger-file tests
 7. package build validation
-8. CI quality gates
-9.  tagged `v0.1.0` release
+8.  tagged `v0.1.0` release
+
 ---
 
 ## Project Structure

@@ -1,10 +1,12 @@
 import csv
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Mapping
 
 from pydantic import ValidationError
 
+from catalog_normalizer.config import NormalizerConfig
 from catalog_normalizer.models import ProductSchema
+from catalog_normalizer.normalizers import normalize_field_value
 from catalog_normalizer.result import (
     NormalizationResult,
     ProcessingSummary,
@@ -12,9 +14,6 @@ from catalog_normalizer.result import (
     RowWarning,
 )
 
-from catalog_normalizer.normalizers import normalize_field_value
-
-from catalog_normalizer.config import NormalizerConfig
 
 class Normalizer:
     def __init__(
@@ -49,14 +48,10 @@ class Normalizer:
 
             if reader.fieldnames is None:
                 raise ValueError("CSV file does not contain a header row.")
-            
+
             detected_columns = tuple(reader.fieldnames)
 
-            unused_columns = tuple(
-                column
-                for column in reader.fieldnames
-                if column not in mappings
-            )
+            unused_columns = tuple(column for column in reader.fieldnames if column not in mappings)
 
             self._validate_source_columns(reader.fieldnames, mappings)
 
@@ -69,47 +64,39 @@ class Normalizer:
                 try:
                     product = self.schema.model_validate(mapped_row)
                 except ValidationError as exc:
-                  rejected_rows += 1
+                    rejected_rows += 1
 
-                  for error in exc.errors():
-                      field = (
-                          str(error["loc"][0])
-                          if error.get("loc")
-                          else None
-                      )
+                    for error in exc.errors():
+                        field = str(error["loc"][0]) if error.get("loc") else None
 
-                      code, message = self._format_validation_error(
-                          field=field,
-                          error_type=error["type"],
-                          default_message=error["msg"],
-                      )
+                        code, message = self._format_validation_error(
+                            field=field,
+                            error_type=error["type"],
+                            default_message=error["msg"],
+                        )
 
-                      result.errors.append(
-                          RowError(
-                              row_number=row_number,
-                              field=field,
-                              code=code,
-                              message=message,
-                              raw_value=(
-                                  raw_mapped_row.get(field)
-                                  if field
-                                  else None
-                              ),
-                          )
-                      )
+                        result.errors.append(
+                            RowError(
+                                row_number=row_number,
+                                field=field,
+                                code=code,
+                                message=message,
+                                raw_value=(raw_mapped_row.get(field) if field else None),
+                            )
+                        )
 
-                  continue
-                
+                    continue
+
                 # Collect warnings for the row
                 row_warnings = self._collect_row_warnings(
                     row_number=row_number,
                     raw_row=raw_mapped_row,
                 )
 
-                # If there are warnings, increment the warned_rows count and add the warnings to the result
+                # If there are warnings, increment warned_rows count and add to the result
                 if row_warnings:
-                  warned_rows += 1
-                  result.warnings.extend(row_warnings)
+                    warned_rows += 1
+                    result.warnings.extend(row_warnings)
 
                 # If the row is valid, add it to the valid_records list
                 result.valid_records.append(product)
@@ -135,7 +122,6 @@ class Normalizer:
             canonical_field: row.get(source_field)
             for source_field, canonical_field in mappings.items()
         }
-
 
     def _normalize_row(
         self,
@@ -168,10 +154,7 @@ class Normalizer:
             )
 
         if len(mapped_fields) != len(set(mapped_fields)):
-            raise ValueError(
-                "Multiple source columns cannot map to the same "
-                "canonical field."
-            )
+            raise ValueError("Multiple source columns cannot map to the same canonical field.")
 
         required_fields = {
             field_name
@@ -189,7 +172,7 @@ class Normalizer:
 
     @staticmethod
     def _validate_source_columns(
-        source_columns: list[str],
+        source_columns: Sequence[str],
         mappings: Mapping[str, str],
     ) -> None:
         """Validate that the source CSV contains all the columns specified in the mappings."""
@@ -197,8 +180,7 @@ class Normalizer:
 
         if missing_columns:
             raise ValueError(
-                "CSV is missing mapped source columns: "
-                + ", ".join(sorted(missing_columns))
+                "CSV is missing mapped source columns: " + ", ".join(sorted(missing_columns))
             )
 
     @staticmethod
@@ -228,7 +210,6 @@ class Normalizer:
 
         return error_type, default_message
 
-
     def _collect_row_warnings(
         self,
         *,
@@ -243,19 +224,13 @@ class Normalizer:
 
             normalized_raw_value = raw_value.strip()
 
-            if (
-                normalized_raw_value
-                and normalized_raw_value in self.config.missing_values
-            ):
+            if normalized_raw_value and normalized_raw_value in self.config.missing_values:
                 warnings.append(
                     RowWarning(
                         row_number=row_number,
                         field=field,
                         code="missing_value_normalized",
-                        message=(
-                            "Configured missing value was "
-                            "normalized to None."
-                        ),
+                        message=("Configured missing value was normalized to None."),
                         raw_value=raw_value,
                     )
                 )

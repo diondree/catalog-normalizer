@@ -1,8 +1,8 @@
+from decimal import Decimal
 from pathlib import Path
 
 from catalog_normalizer import Normalizer, NormalizerConfig
 
-from decimal import Decimal
 
 def test_valid_rows_are_returned_when_another_row_is_invalid(
     tmp_path: Path,
@@ -45,17 +45,13 @@ def test_valid_rows_are_returned_when_another_row_is_invalid(
     assert result.errors[0].row_number == 3
 
 
-
 def test_blank_optional_values_are_normalized_to_none(
     tmp_path: Path,
 ) -> None:
     csv_file = tmp_path / "products.csv"
 
     csv_file.write_text(
-        (
-            "Item Code,Product Desc,Retail Price,Qty\n"
-            "MAG001,Magnesium Citrate,,\n"
-        ),
+        ("Item Code,Product Desc,Retail Price,Qty\nMAG001,Magnesium Citrate,,\n"),
         encoding="utf-8",
     )
 
@@ -80,16 +76,14 @@ def test_blank_optional_values_are_normalized_to_none(
     assert product.price is None
     assert product.inventory is None
 
+
 def test_price_with_currency_symbol_is_normalized(
     tmp_path: Path,
 ) -> None:
     csv_file = tmp_path / "products.csv"
 
     csv_file.write_text(
-        (
-            "Item Code,Product Desc,Retail Price,Qty\n"
-            "MAG001,Magnesium Citrate,$42.95,17\n"
-        ),
+        ("Item Code,Product Desc,Retail Price,Qty\nMAG001,Magnesium Citrate,$42.95,17\n"),
         encoding="utf-8",
     )
 
@@ -120,10 +114,7 @@ def test_price_with_currency_symbol_and_thousands_separator_is_normalized(
     csv_file = tmp_path / "products.csv"
 
     csv_file.write_text(
-        (
-            'Item Code,Product Desc,Retail Price,Qty\n'
-            'MAG001,Magnesium Citrate,"$1,299.99",17\n'
-        ),
+        ('Item Code,Product Desc,Retail Price,Qty\nMAG001,Magnesium Citrate,"$1,299.99",17\n'),
         encoding="utf-8",
     )
 
@@ -146,6 +137,7 @@ def test_price_with_currency_symbol_and_thousands_separator_is_normalized(
     product = result.valid_records[0]
 
     assert product.price == Decimal("1299.99")
+
 
 def test_invalid_price_rejects_only_affected_row(
     tmp_path: Path,
@@ -190,16 +182,14 @@ def test_invalid_price_rejects_only_affected_row(
     assert error.code == "invalid_price"
     assert error.raw_value == "$abc"
 
+
 def test_ambiguous_price_format_is_rejected(
     tmp_path: Path,
 ) -> None:
     csv_file = tmp_path / "products.csv"
 
     csv_file.write_text(
-        (
-            "Item Code,Product Desc,Retail Price,Qty\n"
-            'MAG001,Magnesium Citrate,"1,99",17\n'
-        ),
+        ('Item Code,Product Desc,Retail Price,Qty\nMAG001,Magnesium Citrate,"1,99",17\n'),
         encoding="utf-8",
     )
 
@@ -234,10 +224,7 @@ def test_negative_inventory_is_rejected(
     csv_file = tmp_path / "products.csv"
 
     csv_file.write_text(
-        (
-            "Item Code,Product Desc,Retail Price,Qty\n"
-            "MAG001,Magnesium Citrate,42.95,-3\n"
-        ),
+        ("Item Code,Product Desc,Retail Price,Qty\nMAG001,Magnesium Citrate,42.95,-3\n"),
         encoding="utf-8",
     )
 
@@ -268,16 +255,14 @@ def test_negative_inventory_is_rejected(
     assert error.message == "Inventory cannot be negative."
     assert error.raw_value == "-3"
 
+
 def test_zero_inventory_is_valid(
     tmp_path: Path,
 ) -> None:
     csv_file = tmp_path / "products.csv"
 
     csv_file.write_text(
-        (
-            "Item Code,Product Desc,Retail Price,Qty\n"
-            "MAG001,Magnesium Citrate,42.95,0\n"
-        ),
+        ("Item Code,Product Desc,Retail Price,Qty\nMAG001,Magnesium Citrate,42.95,0\n"),
         encoding="utf-8",
     )
 
@@ -306,10 +291,7 @@ def test_malformed_inventory_is_rejected(
     csv_file = tmp_path / "products.csv"
 
     csv_file.write_text(
-        (
-            "Item Code,Product Desc,Retail Price,Qty\n"
-            "MAG001,Magnesium Citrate,42.95,twelve\n"
-        ),
+        ("Item Code,Product Desc,Retail Price,Qty\nMAG001,Magnesium Citrate,42.95,twelve\n"),
         encoding="utf-8",
     )
 
@@ -347,10 +329,7 @@ def test_decimal_inventory_is_rejected(
     csv_file = tmp_path / "products.csv"
 
     csv_file.write_text(
-        (
-            "Item Code,Product Desc,Retail Price,Qty\n"
-            "MAG001,Magnesium Citrate,42.95,12.5\n"
-        ),
+        ("Item Code,Product Desc,Retail Price,Qty\nMAG001,Magnesium Citrate,42.95,12.5\n"),
         encoding="utf-8",
     )
 
@@ -383,10 +362,7 @@ def test_configured_missing_values_are_normalized_to_none(
     csv_file = tmp_path / "products.csv"
 
     csv_file.write_text(
-        (
-            "Item Code,Product Desc,Retail Price,Qty\n"
-            "MAG001,Magnesium Citrate,N/A,NULL\n"
-        ),
+        ("Item Code,Product Desc,Retail Price,Qty\nMAG001,Magnesium Citrate,N/A,NULL\n"),
         encoding="utf-8",
     )
 
@@ -422,10 +398,7 @@ def test_configured_missing_value_produces_warning(
     csv_file = tmp_path / "products.csv"
 
     csv_file.write_text(
-        (
-            "Item Code,Product Desc,Retail Price,Qty\n"
-            "MAG001,Magnesium Citrate,N/A,12\n"
-        ),
+        ("Item Code,Product Desc,Retail Price,Qty\nMAG001,Magnesium Citrate,N/A,12\n"),
         encoding="utf-8",
     )
 
@@ -459,13 +432,11 @@ def test_configured_missing_value_produces_warning(
     assert warning.row_number == 2
     assert warning.field == "price"
     assert warning.code == "missing_value_normalized"
-    assert (
-        warning.message
-        == "Configured missing value was normalized to None."
-    )
+    assert warning.message == "Configured missing value was normalized to None."
     assert warning.raw_value == "N/A"
 
     assert result.valid_records[0].price is None
+
 
 def test_blank_optional_value_does_not_produce_warning(
     tmp_path: Path,
@@ -473,10 +444,7 @@ def test_blank_optional_value_does_not_produce_warning(
     csv_file = tmp_path / "products.csv"
 
     csv_file.write_text(
-        (
-            "Item Code,Product Desc,Retail Price,Qty\n"
-            "MAG001,Magnesium Citrate,,12\n"
-        ),
+        ("Item Code,Product Desc,Retail Price,Qty\nMAG001,Magnesium Citrate,,12\n"),
         encoding="utf-8",
     )
 
@@ -538,9 +506,7 @@ def test_summary_reports_detected_and_unused_columns(
         "Internal Notes",
     )
 
-    assert result.summary.unused_columns == (
-        "Internal Notes",
-    )
+    assert result.summary.unused_columns == ("Internal Notes",)
 
 
 def test_summary_has_no_unused_columns_when_all_columns_are_mapped(
@@ -549,10 +515,7 @@ def test_summary_has_no_unused_columns_when_all_columns_are_mapped(
     csv_file = tmp_path / "products.csv"
 
     csv_file.write_text(
-        (
-            "Item Code,Product Desc,Retail Price,Qty\n"
-            "MAG001,Magnesium Citrate,42.95,12\n"
-        ),
+        ("Item Code,Product Desc,Retail Price,Qty\nMAG001,Magnesium Citrate,42.95,12\n"),
         encoding="utf-8",
     )
 
@@ -585,17 +548,10 @@ def test_large_csv_can_be_processed(
         encoding="utf-8",
         newline="",
     ) as file:
-        file.write(
-            "Item Code,Product Desc,Retail Price,Qty\n"
-        )
+        file.write("Item Code,Product Desc,Retail Price,Qty\n")
 
         for index in range(row_count):
-            file.write(
-                f"SKU{index:05d},"
-                f"Product {index},"
-                f"42.95,"
-                f"{index}\n"
-            )
+            file.write(f"SKU{index:05d},Product {index},42.95,{index}\n")
 
     normalizer = Normalizer()
 

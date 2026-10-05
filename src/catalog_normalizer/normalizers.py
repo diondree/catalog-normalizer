@@ -1,10 +1,7 @@
 import re
 from collections.abc import Callable, Collection
 
-
-PRICE_PATTERN = re.compile(
-    r"^\$?(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?$"
-)
+PRICE_PATTERN = re.compile(r"^\$?(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?$")
 
 
 def normalize_missing_value(
