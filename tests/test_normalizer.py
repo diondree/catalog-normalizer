@@ -571,3 +571,51 @@ def test_summary_has_no_unused_columns_when_all_columns_are_mapped(
     assert result.summary is not None
 
     assert result.summary.unused_columns == ()
+
+
+def test_large_csv_can_be_processed(
+    tmp_path: Path,
+) -> None:
+    csv_file = tmp_path / "products.csv"
+
+    row_count = 10_000
+
+    with csv_file.open(
+        mode="w",
+        encoding="utf-8",
+        newline="",
+    ) as file:
+        file.write(
+            "Item Code,Product Desc,Retail Price,Qty\n"
+        )
+
+        for index in range(row_count):
+            file.write(
+                f"SKU{index:05d},"
+                f"Product {index},"
+                f"42.95,"
+                f"{index}\n"
+            )
+
+    normalizer = Normalizer()
+
+    result = normalizer.process(
+        csv_file,
+        mappings={
+            "Item Code": "sku",
+            "Product Desc": "name",
+            "Retail Price": "price",
+            "Qty": "inventory",
+        },
+    )
+
+    assert result.summary is not None
+
+    assert result.summary.rows_processed == row_count
+    assert result.summary.valid_rows == row_count
+    assert result.summary.rejected_rows == 0
+
+    assert len(result.valid_records) == row_count
+
+    assert result.valid_records[0].sku == "SKU00000"
+    assert result.valid_records[-1].sku == "SKU09999"

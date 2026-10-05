@@ -40,7 +40,7 @@ The current implementation supports:
 - blank optional values normalized to `None`
 - partial failure
 - processing summaries
-- incremental CSV processing without loading the entire file into memory
+- CSV input is parsed incrementally rather than loading the entire source file into memory
 - US-style price normalization for supported monetary formats
 - conservative rejection of ambiguous price formats
 - row-level validation errors with stable machine-readable error codes
@@ -346,6 +346,7 @@ The current implementation does not yet provide:
 - web APIs
 - retailer-specific rules
 - product deduplication
+- normalized records are currently accumulated in memory in `NormalizationResult`; a streaming result API is planned for larger workloads
 
 These capabilities will be introduced incrementally as their behavior is defined and tested.
 
@@ -392,6 +393,13 @@ Run coverage:
 ```bash
 uv run pytest --cov=catalog_normalizer --cov-report=term-missing
 ```
+
+Large CSV behavior is covered by a regression test using a synthetic
+10,000-row catalog.
+
+The current implementation reads CSV input incrementally, but accepted
+records are retained in `NormalizationResult`, so memory usage still grows
+with the number of accepted products.
 
 ---
 
