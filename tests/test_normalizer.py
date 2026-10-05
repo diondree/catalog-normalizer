@@ -501,3 +501,73 @@ def test_blank_optional_value_does_not_produce_warning(
     assert result.summary.warned_rows == 0
 
     assert result.warnings == []
+
+
+def test_summary_reports_detected_and_unused_columns(
+    tmp_path: Path,
+) -> None:
+    csv_file = tmp_path / "products.csv"
+
+    csv_file.write_text(
+        (
+            "Item Code,Product Desc,Retail Price,Qty,Internal Notes\n"
+            "MAG001,Magnesium Citrate,42.95,12,Top seller\n"
+        ),
+        encoding="utf-8",
+    )
+
+    normalizer = Normalizer()
+
+    result = normalizer.process(
+        csv_file,
+        mappings={
+            "Item Code": "sku",
+            "Product Desc": "name",
+            "Retail Price": "price",
+            "Qty": "inventory",
+        },
+    )
+
+    assert result.summary is not None
+
+    assert result.summary.detected_columns == (
+        "Item Code",
+        "Product Desc",
+        "Retail Price",
+        "Qty",
+        "Internal Notes",
+    )
+
+    assert result.summary.unused_columns == (
+        "Internal Notes",
+    )
+
+
+def test_summary_has_no_unused_columns_when_all_columns_are_mapped(
+    tmp_path: Path,
+) -> None:
+    csv_file = tmp_path / "products.csv"
+
+    csv_file.write_text(
+        (
+            "Item Code,Product Desc,Retail Price,Qty\n"
+            "MAG001,Magnesium Citrate,42.95,12\n"
+        ),
+        encoding="utf-8",
+    )
+
+    normalizer = Normalizer()
+
+    result = normalizer.process(
+        csv_file,
+        mappings={
+            "Item Code": "sku",
+            "Product Desc": "name",
+            "Retail Price": "price",
+            "Qty": "inventory",
+        },
+    )
+
+    assert result.summary is not None
+
+    assert result.summary.unused_columns == ()

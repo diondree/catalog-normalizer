@@ -49,6 +49,7 @@ The current implementation supports:
 - configurable missing-value markers such as `N/A` and `NULL`
 - warnings for configured missing-value markers normalized to `None`
 - processing summaries distinguish valid, warned, and rejected rows
+- detected and unused CSV columns reported in processing summaries
 
 ---
 
@@ -150,6 +151,39 @@ The keys represent columns in the incoming CSV.
 The values represent fields in the canonical product schema.
 
 Explicit mappings keep normalization predictable and avoid making assumptions about external product data.
+
+---
+
+## Column Reporting
+
+Processing summaries report both the columns detected in the source CSV
+and any columns that were not mapped.
+
+For example, given:
+
+```csv
+Item Code,Product Desc,Retail Price,Qty,Internal Notes
+MAG001,Magnesium Citrate,42.95,12,Top seller
+```
+
+with no mapping for `Internal Notes`, the summary contains:
+
+```python
+result.summary.detected_columns == (
+    "Item Code",
+    "Product Desc",
+    "Retail Price",
+    "Qty",
+    "Internal Notes",
+)
+
+result.summary.unused_columns == (
+    "Internal Notes",
+)
+```
+
+Unused columns do not cause the import to fail. They are reported so callers
+can identify source data that was intentionally or accidentally left unmapped.
 
 ---
 
@@ -370,11 +404,10 @@ Upcoming work includes:
 3. additional price-format edge cases
 4. additional warning cases
 5. improved processing summaries
-6. unused-column reporting
-7. larger-file tests
-8. package build validation
-9. CI quality gates
-10. tagged `v0.1.0` release
+6. larger-file tests
+7. package build validation
+8. CI quality gates
+9.  tagged `v0.1.0` release
 ---
 
 ## Project Structure

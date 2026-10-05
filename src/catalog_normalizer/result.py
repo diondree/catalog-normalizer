@@ -28,6 +28,8 @@ class ProcessingSummary:
     valid_rows: int
     warned_rows: int
     rejected_rows: int
+    detected_columns: tuple[str, ...] = ()
+    unused_columns: tuple[str, ...] = ()
 
 
 @dataclass

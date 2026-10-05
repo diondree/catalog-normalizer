@@ -49,6 +49,14 @@ class Normalizer:
 
             if reader.fieldnames is None:
                 raise ValueError("CSV file does not contain a header row.")
+            
+            detected_columns = tuple(reader.fieldnames)
+
+            unused_columns = tuple(
+                column
+                for column in reader.fieldnames
+                if column not in mappings
+            )
 
             self._validate_source_columns(reader.fieldnames, mappings)
 
@@ -112,6 +120,8 @@ class Normalizer:
             valid_rows=len(result.valid_records),
             warned_rows=warned_rows,
             rejected_rows=rejected_rows,
+            detected_columns=detected_columns,
+            unused_columns=unused_columns,
         )
 
         return result
