@@ -177,4 +177,10 @@ class Normalizer:
                 "Invalid price value.",
             )
 
+        if field == "inventory" and error_type == "greater_than_equal":
+            return (
+                "negative_inventory",
+                "Inventory cannot be negative.",
+            )
+
         return error_type, default_message
