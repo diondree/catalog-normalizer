@@ -1,4 +1,4 @@
-from catalog_normalizer.normalizers import normalize_price
+from catalog_normalizer.normalizers import normalize_price, normalize_missing_value
 
 
 def test_normalize_price_removes_currency_symbol() -> None:
@@ -20,3 +20,15 @@ def test_normalize_price_does_not_guess_ambiguous_format() -> None:
 
 def test_normalize_price_supports_multiple_thousands_groups() -> None:
     assert normalize_price("$12,999,999.99") == "12999999.99"
+
+def test_normalize_missing_value_respects_configured_markers() -> None:
+    assert (
+        normalize_missing_value(
+            "N/A",
+            {"N/A", "NULL"},
+        )
+        is None
+    )
+
+def test_unconfigured_missing_marker_is_preserved() -> None:
+    assert normalize_missing_value("N/A") == "N/A"

@@ -1,5 +1,5 @@
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 
 
 PRICE_PATTERN = re.compile(
@@ -7,7 +7,10 @@ PRICE_PATTERN = re.compile(
 )
 
 
-def normalize_missing_value(value: str | None) -> str | None:
+def normalize_missing_value(
+    value: str | None,
+    missing_values: Collection[str] = (),
+) -> str | None:
     if value is None:
         return None
 
@@ -16,18 +19,24 @@ def normalize_missing_value(value: str | None) -> str | None:
     if normalized == "":
         return None
 
+    if normalized in missing_values:
+        return None
+
     return normalized
 
 
-def normalize_price(value: str | None) -> str | None:
-    normalized = normalize_missing_value(value)
+def normalize_price(
+    value: str | None,
+    missing_values: Collection[str] = (),
+) -> str | None:
+    normalized = normalize_missing_value(
+        value,
+        missing_values,
+    )
 
     if normalized is None:
         return None
 
-    # Only normalize formats we explicitly understand.
-    # Unknown or ambiguous values are left untouched so
-    # validation can reject them rather than guessing.
     if PRICE_PATTERN.fullmatch(normalized) is None:
         return normalized
 
@@ -37,7 +46,10 @@ def normalize_price(value: str | None) -> str | None:
     return normalized.replace(",", "")
 
 
-FieldNormalizer = Callable[[str | None], str | None]
+FieldNormalizer = Callable[
+    [str | None, Collection[str]],
+    str | None,
+]
 
 
 FIELD_NORMALIZERS: dict[str, FieldNormalizer] = {
@@ -48,10 +60,15 @@ FIELD_NORMALIZERS: dict[str, FieldNormalizer] = {
 def normalize_field_value(
     field: str,
     value: str | None,
+    *,
+    missing_values: Collection[str] = (),
 ) -> str | None:
     normalizer = FIELD_NORMALIZERS.get(
         field,
         normalize_missing_value,
     )
 
-    return normalizer(value)
+    return normalizer(
+        value,
+        missing_values,
+    )

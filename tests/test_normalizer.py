@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from catalog_normalizer import Normalizer
+from catalog_normalizer import Normalizer, NormalizerConfig
 
 from decimal import Decimal
 
@@ -375,3 +375,42 @@ def test_decimal_inventory_is_rejected(
     assert error.field == "inventory"
     assert error.code == "invalid_inventory"
     assert error.raw_value == "12.5"
+
+
+def test_configured_missing_values_are_normalized_to_none(
+    tmp_path: Path,
+) -> None:
+    csv_file = tmp_path / "products.csv"
+
+    csv_file.write_text(
+        (
+            "Item Code,Product Desc,Retail Price,Qty\n"
+            "MAG001,Magnesium Citrate,N/A,NULL\n"
+        ),
+        encoding="utf-8",
+    )
+
+    normalizer = Normalizer(
+        config=NormalizerConfig(
+            missing_values={"N/A", "NULL"},
+        )
+    )
+
+    result = normalizer.process(
+        csv_file,
+        mappings={
+            "Item Code": "sku",
+            "Product Desc": "name",
+            "Retail Price": "price",
+            "Qty": "inventory",
+        },
+    )
+
+    assert result.summary is not None
+    assert result.summary.valid_rows == 1
+    assert result.summary.rejected_rows == 0
+
+    product = result.valid_records[0]
+
+    assert product.price is None
+    assert product.inventory is None

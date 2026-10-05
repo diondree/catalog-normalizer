@@ -44,6 +44,9 @@ The current implementation supports:
 - US-style price normalization for supported monetary formats
 - conservative rejection of ambiguous price formats
 - row-level validation errors with stable machine-readable error codes
+- non-negative integer inventory validation
+- stable `negative_inventory` and `invalid_inventory` error codes 
+- configurable missing-value markers such as `N/A` and `NULL`
 
 ---
 
@@ -260,7 +263,6 @@ The project is intentionally small while the v0.1 API is being developed.
 
 The current implementation does not yet provide:
 
-- configurable missing-value markers such as `N/A` or `NULL`
 - advanced inventory normalization
 - Excel/XLSX support
 - automatic column detection
@@ -322,7 +324,7 @@ uv run pytest --cov=catalog_normalizer --cov-report=term-missing
 
 Upcoming work includes:
 
-1. inventory normalization
+1. additional inventory edge cases
 2. configurable missing-value handling
 3. additional price-format edge cases
 4. warnings

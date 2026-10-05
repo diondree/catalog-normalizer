@@ -13,9 +13,16 @@ from catalog_normalizer.result import (
 
 from catalog_normalizer.normalizers import normalize_field_value
 
+from catalog_normalizer.config import NormalizerConfig
+
 class Normalizer:
-    def __init__(self, schema: type[ProductSchema] = ProductSchema):
+    def __init__(
+        self,
+        schema: type[ProductSchema] = ProductSchema,
+        config: NormalizerConfig | None = None,
+    ):
         self.schema = schema
+        self.config = config or NormalizerConfig()
 
     def process(
         self,
@@ -109,7 +116,11 @@ class Normalizer:
         row: Mapping[str, str | None],
     ) -> dict[str, str | None]:
         return {
-            field: normalize_field_value(field, value)
+            field: normalize_field_value(
+                field,
+                value,
+                missing_values=self.config.missing_values,
+            )
             for field, value in row.items()
         }
 
