@@ -183,4 +183,10 @@ class Normalizer:
                 "Inventory cannot be negative.",
             )
 
+        if field == "inventory" and error_type == "int_parsing":
+            return (
+                "invalid_inventory",
+                "Invalid inventory value.",
+            )
+
         return error_type, default_message

@@ -298,3 +298,80 @@ def test_zero_inventory_is_valid(
     assert result.summary.rejected_rows == 0
 
     assert result.valid_records[0].inventory == 0
+
+
+def test_malformed_inventory_is_rejected(
+    tmp_path: Path,
+) -> None:
+    csv_file = tmp_path / "products.csv"
+
+    csv_file.write_text(
+        (
+            "Item Code,Product Desc,Retail Price,Qty\n"
+            "MAG001,Magnesium Citrate,42.95,twelve\n"
+        ),
+        encoding="utf-8",
+    )
+
+    normalizer = Normalizer()
+
+    result = normalizer.process(
+        csv_file,
+        mappings={
+            "Item Code": "sku",
+            "Product Desc": "name",
+            "Retail Price": "price",
+            "Qty": "inventory",
+        },
+    )
+
+    assert result.summary is not None
+    assert result.summary.rows_processed == 1
+    assert result.summary.valid_rows == 0
+    assert result.summary.rejected_rows == 1
+
+    assert len(result.errors) == 1
+
+    error = result.errors[0]
+
+    assert error.row_number == 2
+    assert error.field == "inventory"
+    assert error.code == "invalid_inventory"
+    assert error.message == "Invalid inventory value."
+    assert error.raw_value == "twelve"
+
+
+def test_decimal_inventory_is_rejected(
+    tmp_path: Path,
+) -> None:
+    csv_file = tmp_path / "products.csv"
+
+    csv_file.write_text(
+        (
+            "Item Code,Product Desc,Retail Price,Qty\n"
+            "MAG001,Magnesium Citrate,42.95,12.5\n"
+        ),
+        encoding="utf-8",
+    )
+
+    normalizer = Normalizer()
+
+    result = normalizer.process(
+        csv_file,
+        mappings={
+            "Item Code": "sku",
+            "Product Desc": "name",
+            "Retail Price": "price",
+            "Qty": "inventory",
+        },
+    )
+
+    assert result.summary is not None
+    assert result.summary.valid_rows == 0
+    assert result.summary.rejected_rows == 1
+
+    error = result.errors[0]
+
+    assert error.field == "inventory"
+    assert error.code == "invalid_inventory"
+    assert error.raw_value == "12.5"
