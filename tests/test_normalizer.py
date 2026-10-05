@@ -146,3 +146,46 @@ def test_price_with_currency_symbol_and_thousands_separator_is_normalized(
     product = result.valid_records[0]
 
     assert product.price == Decimal("1299.99")
+
+def test_invalid_price_rejects_only_affected_row(
+    tmp_path: Path,
+) -> None:
+    csv_file = tmp_path / "products.csv"
+
+    csv_file.write_text(
+        (
+            "Item Code,Product Desc,Retail Price,Qty\n"
+            "MAG001,Magnesium Citrate,$42.95,17\n"
+            "VIT002,Vitamin D3,$abc,8\n"
+        ),
+        encoding="utf-8",
+    )
+
+    normalizer = Normalizer()
+
+    result = normalizer.process(
+        csv_file,
+        mappings={
+            "Item Code": "sku",
+            "Product Desc": "name",
+            "Retail Price": "price",
+            "Qty": "inventory",
+        },
+    )
+
+    assert result.summary is not None
+    assert result.summary.rows_processed == 2
+    assert result.summary.valid_rows == 1
+    assert result.summary.rejected_rows == 1
+
+    assert len(result.valid_records) == 1
+    assert result.valid_records[0].sku == "MAG001"
+
+    assert len(result.errors) == 1
+
+    error = result.errors[0]
+
+    assert error.row_number == 3
+    assert error.field == "price"
+    assert error.code == "invalid_price"
+    assert error.raw_value == "$abc"

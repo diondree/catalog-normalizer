@@ -46,34 +46,42 @@ class Normalizer:
             for row_number, row in enumerate(reader, start=2):
                 rows_processed += 1
 
-                mapped_row = self._map_row(row, mappings)
+                raw_mapped_row = self._map_raw_row(row, mappings)
+                mapped_row = self._normalize_row(raw_mapped_row)
 
                 try:
                     product = self.schema.model_validate(mapped_row)
                 except ValidationError as exc:
-                    rejected_rows += 1
+                  rejected_rows += 1
 
-                    for error in exc.errors():
-                        field = (
-                            str(error["loc"][0])
-                            if error.get("loc")
-                            else None
-                        )
+                  for error in exc.errors():
+                      field = (
+                          str(error["loc"][0])
+                          if error.get("loc")
+                          else None
+                      )
 
-                        result.errors.append(
-                            RowError(
-                                row_number=row_number,
-                                field=field,
-                                code=error["type"],
-                                message=error["msg"],
-                                raw_value=mapped_row.get(field)
-                                if field
-                                else None,
-                            )
-                        )
+                      code, message = self._format_validation_error(
+                          field=field,
+                          error_type=error["type"],
+                          default_message=error["msg"],
+                      )
 
-                    continue
+                      result.errors.append(
+                          RowError(
+                              row_number=row_number,
+                              field=field,
+                              code=code,
+                              message=message,
+                              raw_value=(
+                                  raw_mapped_row.get(field)
+                                  if field
+                                  else None
+                              ),
+                          )
+                      )
 
+                  continue
                 result.valid_records.append(product)
 
         result.summary = ProcessingSummary(
@@ -85,17 +93,24 @@ class Normalizer:
 
         return result
 
-    def _map_row(
+    def _map_raw_row(
         self,
         row: Mapping[str, str | None],
         mappings: Mapping[str, str],
     ) -> dict[str, str | None]:
         return {
-            canonical_field: normalize_field_value(
-                canonical_field,
-                row.get(source_field),
-            )
+            canonical_field: row.get(source_field)
             for source_field, canonical_field in mappings.items()
+        }
+
+
+    def _normalize_row(
+        self,
+        row: Mapping[str, str | None],
+    ) -> dict[str, str | None]:
+        return {
+            field: normalize_field_value(field, value)
+            for field, value in row.items()
         }
 
     def _validate_mappings(
@@ -148,3 +163,18 @@ class Normalizer:
                 "CSV is missing mapped source columns: "
                 + ", ".join(sorted(missing_columns))
             )
+
+    @staticmethod
+    def _format_validation_error(
+        *,
+        field: str | None,
+        error_type: str,
+        default_message: str,
+    ) -> tuple[str, str]:
+        if field == "price" and error_type == "decimal_parsing":
+            return (
+                "invalid_price",
+                "Invalid price value.",
+            )
+
+        return error_type, default_message

@@ -41,7 +41,7 @@ The current implementation supports:
 - row-level validation errors
 - partial failure
 - processing summaries
-- streaming CSV iteration rather than loading the entire file at once
+- rows are parsed incrementally rather than reading the entire CSV into memory at once.
 
 ---
 
@@ -65,7 +65,7 @@ The current product schema contains:
 
 ## Development Setup
 
-This project uses Python 3.12+ and `uv`.
+This project uses Python 3.13+ and `uv`.
 
 Clone the repository and install the project dependencies:
 
@@ -238,8 +238,6 @@ The project is intentionally small while the v0.1 API is being developed.
 
 The current implementation does not yet provide:
 
-- currency-symbol price normalization
-- thousands-separator normalization
 - configurable missing-value markers such as `N/A` or `NULL`
 - advanced inventory normalization
 - Excel/XLSX support
