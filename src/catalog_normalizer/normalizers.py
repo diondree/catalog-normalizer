@@ -1,4 +1,10 @@
+import re
 from collections.abc import Callable
+
+
+PRICE_PATTERN = re.compile(
+    r"^\$?(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?$"
+)
 
 
 def normalize_missing_value(value: str | None) -> str | None:
@@ -19,12 +25,16 @@ def normalize_price(value: str | None) -> str | None:
     if normalized is None:
         return None
 
+    # Only normalize formats we explicitly understand.
+    # Unknown or ambiguous values are left untouched so
+    # validation can reject them rather than guessing.
+    if PRICE_PATTERN.fullmatch(normalized) is None:
+        return normalized
+
     if normalized.startswith("$"):
-        normalized = normalized[1:].strip()
+        normalized = normalized[1:]
 
-    normalized = normalized.replace(",", "")
-
-    return normalized
+    return normalized.replace(",", "")
 
 
 FieldNormalizer = Callable[[str | None], str | None]

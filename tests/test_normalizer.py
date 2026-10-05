@@ -189,3 +189,40 @@ def test_invalid_price_rejects_only_affected_row(
     assert error.field == "price"
     assert error.code == "invalid_price"
     assert error.raw_value == "$abc"
+
+def test_ambiguous_price_format_is_rejected(
+    tmp_path: Path,
+) -> None:
+    csv_file = tmp_path / "products.csv"
+
+    csv_file.write_text(
+        (
+            "Item Code,Product Desc,Retail Price,Qty\n"
+            'MAG001,Magnesium Citrate,"1,99",17\n'
+        ),
+        encoding="utf-8",
+    )
+
+    normalizer = Normalizer()
+
+    result = normalizer.process(
+        csv_file,
+        mappings={
+            "Item Code": "sku",
+            "Product Desc": "name",
+            "Retail Price": "price",
+            "Qty": "inventory",
+        },
+    )
+
+    assert result.summary is not None
+    assert result.summary.valid_rows == 0
+    assert result.summary.rejected_rows == 1
+
+    assert len(result.errors) == 1
+
+    error = result.errors[0]
+
+    assert error.field == "price"
+    assert error.code == "invalid_price"
+    assert error.raw_value == "1,99"

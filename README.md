@@ -35,13 +35,15 @@ The current implementation supports:
 - CSV processing
 - explicit source-to-canonical column mappings
 - canonical product validation with Pydantic
-- required product SKU and name
+- required, non-blank product SKU and name
 - whitespace cleanup
 - blank optional values normalized to `None`
-- row-level validation errors
 - partial failure
 - processing summaries
-- rows are parsed incrementally rather than reading the entire CSV into memory at once.
+- incremental CSV processing without loading the entire file into memory
+- US-style price normalization for supported monetary formats
+- conservative rejection of ambiguous price formats
+- row-level validation errors with stable machine-readable error codes
 
 ---
 
@@ -190,10 +192,10 @@ Validation errors contain useful information about the failed row:
 ```python
 RowError(
     row_number=3,
-    field="sku",
-    code="...",
-    message="...",
-    raw_value=None,
+    field="price",
+    code="invalid_price",
+    message="Invalid price value.",
+    raw_value="$abc",
 )
 ```
 
@@ -229,6 +231,26 @@ becomes conceptually:
 Because `price` and `inventory` are optional, the product remains valid.
 
 Required fields such as `sku` and `name` cannot be blank.
+
+---
+
+## Price Formatting
+
+v0.1 supports unambiguous US-style monetary formatting.
+
+Examples:
+
+- `42`
+- `42.95`
+- `$42.95`
+- `1,299.99`
+- `$1,299.99`
+
+Ambiguous or unsupported formats such as `1,99` are rejected rather
+than interpreted automatically.
+
+The normalizer intentionally avoids guessing when monetary formatting
+is ambiguous.
 
 ---
 
@@ -300,9 +322,9 @@ uv run pytest --cov=catalog_normalizer --cov-report=term-missing
 
 Upcoming work includes:
 
-1. price normalization
-2. inventory normalization
-3. configurable missing-value handling
+1. inventory normalization
+2. configurable missing-value handling
+3. additional price-format edge cases
 4. warnings
 5. improved processing summaries
 6. unused-column reporting
@@ -310,7 +332,6 @@ Upcoming work includes:
 8. package build validation
 9. CI quality gates
 10. tagged `v0.1.0` release
-
 ---
 
 ## Project Structure
@@ -327,7 +348,8 @@ catalog-normalizer/
 │       ├── normalizers.py
 │       └── result.py
 ├── tests/
-│   └── test_normalizer.py
+│    ├── test_normalizer.py
+│    └── test_normalizers.py
 ├── .gitignore
 ├── pyproject.toml
 ├── README.md
