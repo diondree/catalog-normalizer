@@ -47,6 +47,8 @@ The current implementation supports:
 - non-negative integer inventory validation
 - stable `negative_inventory` and `invalid_inventory` error codes 
 - configurable missing-value markers such as `N/A` and `NULL`
+- warnings for configured missing-value markers normalized to `None`
+- processing summaries distinguish valid, warned, and rejected rows
 
 ---
 
@@ -237,6 +239,45 @@ Required fields such as `sku` and `name` cannot be blank.
 
 ---
 
+## Warnings
+
+Some normalization behavior preserves a valid row while still reporting
+that source data was changed.
+
+For example, if `N/A` is explicitly configured as a missing-value marker:
+
+```python
+normalizer = Normalizer(
+    config=NormalizerConfig(
+        missing_values={"N/A"},
+    )
+)
+```
+
+then:
+
+```csv
+Item Code,Product Desc,Retail Price,Qty
+MAG001,Magnesium Citrate,N/A,12
+```
+
+remains a valid product, but produces:
+
+```python
+RowWarning(
+    row_number=2,
+    field="price",
+    code="missing_value_normalized",
+    message="Configured missing value was normalized to None.",
+    raw_value="N/A",
+)
+```
+
+Ordinary blank optional values are normalized to `None` without producing
+a warning.
+
+---
+
 ## Price Formatting
 
 v0.1 supports unambiguous US-style monetary formatting.
@@ -327,7 +368,7 @@ Upcoming work includes:
 1. additional inventory edge cases
 2. configurable missing-value handling
 3. additional price-format edge cases
-4. warnings
+4. additional warning cases
 5. improved processing summaries
 6. unused-column reporting
 7. larger-file tests

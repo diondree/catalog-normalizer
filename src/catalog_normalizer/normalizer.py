@@ -9,6 +9,7 @@ from catalog_normalizer.result import (
     NormalizationResult,
     ProcessingSummary,
     RowError,
+    RowWarning,
 )
 
 from catalog_normalizer.normalizers import normalize_field_value
@@ -36,6 +37,7 @@ class Normalizer:
         result = NormalizationResult()
 
         rows_processed = 0
+        warned_rows = 0
         rejected_rows = 0
 
         with Path(file_path).open(
@@ -89,12 +91,26 @@ class Normalizer:
                       )
 
                   continue
+                
+                # Collect warnings for the row
+                row_warnings = self._collect_row_warnings(
+                    row_number=row_number,
+                    raw_row=raw_mapped_row,
+                )
+
+                # If there are warnings, increment the warned_rows count and add the warnings to the result
+                if row_warnings:
+                  warned_rows += 1
+                  result.warnings.extend(row_warnings)
+
+                # If the row is valid, add it to the valid_records list
                 result.valid_records.append(product)
 
+        # Update the summary of the normalization result
         result.summary = ProcessingSummary(
             rows_processed=rows_processed,
             valid_rows=len(result.valid_records),
-            warned_rows=0,
+            warned_rows=warned_rows,
             rejected_rows=rejected_rows,
         )
 
@@ -201,3 +217,37 @@ class Normalizer:
             )
 
         return error_type, default_message
+
+
+    def _collect_row_warnings(
+        self,
+        *,
+        row_number: int,
+        raw_row: Mapping[str, str | None],
+    ) -> list[RowWarning]:
+        warnings: list[RowWarning] = []
+
+        for field, raw_value in raw_row.items():
+            if raw_value is None:
+                continue
+
+            normalized_raw_value = raw_value.strip()
+
+            if (
+                normalized_raw_value
+                and normalized_raw_value in self.config.missing_values
+            ):
+                warnings.append(
+                    RowWarning(
+                        row_number=row_number,
+                        field=field,
+                        code="missing_value_normalized",
+                        message=(
+                            "Configured missing value was "
+                            "normalized to None."
+                        ),
+                        raw_value=raw_value,
+                    )
+                )
+
+        return warnings

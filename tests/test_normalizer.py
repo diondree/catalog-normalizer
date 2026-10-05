@@ -414,3 +414,90 @@ def test_configured_missing_values_are_normalized_to_none(
 
     assert product.price is None
     assert product.inventory is None
+
+
+def test_configured_missing_value_produces_warning(
+    tmp_path: Path,
+) -> None:
+    csv_file = tmp_path / "products.csv"
+
+    csv_file.write_text(
+        (
+            "Item Code,Product Desc,Retail Price,Qty\n"
+            "MAG001,Magnesium Citrate,N/A,12\n"
+        ),
+        encoding="utf-8",
+    )
+
+    normalizer = Normalizer(
+        config=NormalizerConfig(
+            missing_values={"N/A"},
+        )
+    )
+
+    result = normalizer.process(
+        csv_file,
+        mappings={
+            "Item Code": "sku",
+            "Product Desc": "name",
+            "Retail Price": "price",
+            "Qty": "inventory",
+        },
+    )
+
+    assert result.summary is not None
+
+    assert result.summary.rows_processed == 1
+    assert result.summary.valid_rows == 1
+    assert result.summary.warned_rows == 1
+    assert result.summary.rejected_rows == 0
+
+    assert len(result.warnings) == 1
+
+    warning = result.warnings[0]
+
+    assert warning.row_number == 2
+    assert warning.field == "price"
+    assert warning.code == "missing_value_normalized"
+    assert (
+        warning.message
+        == "Configured missing value was normalized to None."
+    )
+    assert warning.raw_value == "N/A"
+
+    assert result.valid_records[0].price is None
+
+def test_blank_optional_value_does_not_produce_warning(
+    tmp_path: Path,
+) -> None:
+    csv_file = tmp_path / "products.csv"
+
+    csv_file.write_text(
+        (
+            "Item Code,Product Desc,Retail Price,Qty\n"
+            "MAG001,Magnesium Citrate,,12\n"
+        ),
+        encoding="utf-8",
+    )
+
+    normalizer = Normalizer(
+        config=NormalizerConfig(
+            missing_values={"N/A"},
+        )
+    )
+
+    result = normalizer.process(
+        csv_file,
+        mappings={
+            "Item Code": "sku",
+            "Product Desc": "name",
+            "Retail Price": "price",
+            "Qty": "inventory",
+        },
+    )
+
+    assert result.summary is not None
+    assert result.summary.valid_rows == 1
+    assert result.summary.warned_rows == 0
+
+    assert result.warnings == []
