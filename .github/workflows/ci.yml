@@ -41,3 +41,66 @@ jobs:
           --cov=catalog_normalizer
           --cov-report=term-missing
           --cov-fail-under=90
+
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Build package
+        run: uv build
+
+      - name: Create clean environment
+        run: uv venv --python 3.13 .package-test
+
+      - name: Install built wheel
+        run: >
+          uv pip install
+          --python .package-test/bin/python
+          dist/*.whl
+
+      - name: Smoke test installed package
+        run: |
+          .package-test/bin/python - <<'PY'
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+
+          from catalog_normalizer import Normalizer
+
+          with TemporaryDirectory() as tmp:
+              csv_file = Path(tmp) / "products.csv"
+
+              csv_file.write_text(
+                  (
+                      "Item Code,Product Desc,Retail Price,Qty\n"
+                      "MAG001,Magnesium Citrate,$42.95,17\n"
+                  ),
+                  encoding="utf-8",
+              )
+
+              result = Normalizer().process(
+                  csv_file,
+                  mappings={
+                      "Item Code": "sku",
+                      "Product Desc": "name",
+                      "Retail Price": "price",
+                      "Qty": "inventory",
+                  },
+              )
+
+              assert result.summary is not None
+              assert result.summary.valid_rows == 1
+              assert result.valid_records[0].sku == "MAG001"
+
+          print("package smoke test OK")
+          PY
