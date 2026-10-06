@@ -51,6 +51,8 @@ The current implementation supports:
 - processing summaries distinguish valid, warned, and rejected rows
 - detected and unused CSV columns reported in processing summaries
 - automated formatting, linting, type checking, tests, and coverage reporting in CI
+- wheel and source-distribution build validation
+- clean-environment installation and package smoke testing in CI
 
 ---
 
@@ -413,7 +415,10 @@ The CI pipeline currently verifies:
 - Ruff linting
 - Pyright type checking
 - pytest
-- test coverage reporting
+- test coverage reporting with a minimum 90% coverage gate
+- wheel and source-distribution builds
+- clean-environment installation of the built wheel
+- smoke testing through the package's public API
 
 The same checks can be run locally:
 
@@ -439,8 +444,7 @@ Upcoming work includes:
 4. additional warning cases
 5. improved processing summaries
 6. larger-file tests
-7. package build validation
-8.  tagged `v0.1.0` release
+7. tagged `v0.1.0` release
 
 ---
 
