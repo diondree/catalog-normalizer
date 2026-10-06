@@ -1,4 +1,10 @@
-from catalog_normalizer.normalizers import normalize_missing_value, normalize_price
+import pytest
+
+from catalog_normalizer.normalizers import (
+    NormalizationError,
+    normalize_missing_value,
+    normalize_price,
+)
 
 
 def test_normalize_price_removes_currency_symbol() -> None:
@@ -17,8 +23,12 @@ def test_normalize_price_removes_thousands_separator() -> None:
     assert normalize_price("$1,299.99") == "1299.99"
 
 
-def test_normalize_price_does_not_guess_ambiguous_format() -> None:
-    assert normalize_price("1,99") == "1,99"
+def test_normalize_price_rejects_ambiguous_format() -> None:
+    with pytest.raises(NormalizationError) as exc_info:
+        normalize_price("1,99")
+
+    assert exc_info.value.code == "invalid_price"
+    assert exc_info.value.message == "Invalid price value."
 
 
 def test_normalize_price_supports_multiple_thousands_groups() -> None:
@@ -37,3 +47,26 @@ def test_normalize_missing_value_respects_configured_markers() -> None:
 
 def test_unconfigured_missing_marker_is_preserved() -> None:
     assert normalize_missing_value("N/A") == "N/A"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "42.",
+        ".95",
+        "$ 42.95",
+        "+42.95",
+        "-42.95",
+        "1e3",
+        "NaN",
+        "Infinity",
+        "1_000.00",
+    ],
+)
+def test_normalize_price_rejects_unsupported_formats(
+    value: str,
+) -> None:
+    with pytest.raises(NormalizationError) as exc_info:
+        normalize_price(value)
+
+    assert exc_info.value.code == "invalid_price"
