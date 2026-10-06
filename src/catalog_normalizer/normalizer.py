@@ -6,7 +6,7 @@ from pydantic import ValidationError
 
 from catalog_normalizer.config import NormalizerConfig
 from catalog_normalizer.models import ProductSchema
-from catalog_normalizer.normalizers import normalize_field_value
+from catalog_normalizer.normalizers import NormalizationError, normalize_field_value
 from catalog_normalizer.result import (
     NormalizationResult,
     ProcessingSummary,
@@ -59,7 +59,23 @@ class Normalizer:
                 rows_processed += 1
 
                 raw_mapped_row = self._map_raw_row(row, mappings)
-                mapped_row = self._normalize_row(raw_mapped_row)
+                mapped_row, normalization_errors = self._normalize_row(raw_mapped_row)
+
+                if normalization_errors:
+                    rejected_rows += 1
+
+                    for field, error in normalization_errors:
+                        result.errors.append(
+                            RowError(
+                                row_number=row_number,
+                                field=field,
+                                code=error.code,
+                                message=error.message,
+                                raw_value=raw_mapped_row.get(field),
+                            )
+                        )
+
+                    continue
 
                 try:
                     product = self.schema.model_validate(mapped_row)
@@ -126,15 +142,24 @@ class Normalizer:
     def _normalize_row(
         self,
         row: Mapping[str, str | None],
-    ) -> dict[str, str | None]:
-        return {
-            field: normalize_field_value(
-                field,
-                value,
-                missing_values=self.config.missing_values,
-            )
-            for field, value in row.items()
-        }
+    ) -> tuple[
+        dict[str, str | None],
+        list[tuple[str, NormalizationError]],
+    ]:
+        normalized_row: dict[str, str | None] = {}
+        errors: list[tuple[str, NormalizationError]] = []
+
+        for field, value in row.items():
+            try:
+                normalized_row[field] = normalize_field_value(
+                    field,
+                    value,
+                    missing_values=self.config.missing_values,
+                )
+            except NormalizationError as exc:
+                errors.append((field, exc))
+
+        return normalized_row, errors
 
     def _validate_mappings(
         self,

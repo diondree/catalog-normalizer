@@ -35,7 +35,10 @@ def normalize_price(
         return None
 
     if PRICE_PATTERN.fullmatch(normalized) is None:
-        return normalized
+        raise NormalizationError(
+            code="invalid_price",
+            message="Invalid price value.",
+        )
 
     if normalized.startswith("$"):
         normalized = normalized[1:]
@@ -69,3 +72,15 @@ def normalize_field_value(
         value,
         missing_values,
     )
+
+
+class NormalizationError(ValueError):
+    def __init__(
+        self,
+        *,
+        code: str,
+        message: str,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message

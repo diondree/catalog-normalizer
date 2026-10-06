@@ -315,18 +315,38 @@ a warning.
 
 ## Price Formatting
 
-v0.1 supports unambiguous US-style monetary formatting.
+v0.1 supports a deliberately narrow set of unambiguous US-style
+monetary formats.
 
-Examples:
+Supported examples include:
 
+- `0`
 - `42`
 - `42.95`
 - `$42.95`
+- `1,299`
 - `1,299.99`
 - `$1,299.99`
+- `1,000,000.00`
 
-Ambiguous or unsupported formats such as `1,99` are rejected rather
-than interpreted automatically.
+Leading and trailing whitespace is ignored.
+
+Unsupported or ambiguous formats are rejected rather than interpreted
+automatically. Examples include:
+
+- `42.`
+- `.95`
+- `$ 42.95`
+- `+42.95`
+- `-42.95`
+- `1,99`
+- `12,34.56`
+- `1e3`
+- `NaN`
+- `Infinity`
+- `1_000.00`
+
+Unsupported values produce the stable error code `invalid_price`.
 
 The normalizer intentionally avoids guessing when monetary formatting
 is ambiguous.

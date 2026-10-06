@@ -1,6 +1,8 @@
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
+
 from catalog_normalizer import Normalizer, NormalizerConfig
 
 
@@ -575,3 +577,98 @@ def test_large_csv_can_be_processed(
 
     assert result.valid_records[0].sku == "SKU00000"
     assert result.valid_records[-1].sku == "SKU09999"
+
+
+@pytest.mark.parametrize(
+    ("raw_price", "expected_price"),
+    [
+        ("0", Decimal("0")),
+        ("0.00", Decimal("0.00")),
+        ("$0.00", Decimal("0.00")),
+        ("999", Decimal("999")),
+        ("999.9", Decimal("999.9")),
+        ("1,000", Decimal("1000")),
+        ("$1,000", Decimal("1000")),
+        ("$1,000.00", Decimal("1000.00")),
+        ("  $42.95  ", Decimal("42.95")),
+        ("1,000,000.00", Decimal("1000000.00")),
+        ("01.99", Decimal("1.99")),
+    ],
+)
+def test_supported_price_formats_are_accepted(
+    tmp_path: Path,
+    raw_price: str,
+    expected_price: Decimal,
+) -> None:
+    csv_file = tmp_path / "products.csv"
+
+    csv_file.write_text(
+        (f'Item Code,Product Desc,Retail Price,Qty\nMAG001,Magnesium Citrate,"{raw_price}",12\n'),
+        encoding="utf-8",
+    )
+
+    result = Normalizer().process(
+        csv_file,
+        mappings={
+            "Item Code": "sku",
+            "Product Desc": "name",
+            "Retail Price": "price",
+            "Qty": "inventory",
+        },
+    )
+
+    assert result.summary is not None
+    assert result.summary.valid_rows == 1
+    assert result.summary.rejected_rows == 0
+
+    assert result.valid_records[0].price == expected_price
+
+
+@pytest.mark.parametrize(
+    "raw_price",
+    [
+        "42.",
+        ".95",
+        "$ 42.95",
+        "+42.95",
+        "-42.95",
+        "1,99",
+        "12,34.56",
+        "1e3",
+        "NaN",
+        "Infinity",
+        "1_000.00",
+    ],
+)
+def test_unsupported_price_formats_are_rejected(
+    tmp_path: Path,
+    raw_price: str,
+) -> None:
+    csv_file = tmp_path / "products.csv"
+
+    csv_file.write_text(
+        (f'Item Code,Product Desc,Retail Price,Qty\nMAG001,Magnesium Citrate,"{raw_price}",12\n'),
+        encoding="utf-8",
+    )
+
+    result = Normalizer().process(
+        csv_file,
+        mappings={
+            "Item Code": "sku",
+            "Product Desc": "name",
+            "Retail Price": "price",
+            "Qty": "inventory",
+        },
+    )
+
+    assert result.summary is not None
+    assert result.summary.valid_rows == 0
+    assert result.summary.rejected_rows == 1
+
+    assert len(result.errors) == 1
+
+    error = result.errors[0]
+
+    assert error.field == "price"
+    assert error.code == "invalid_price"
+    assert error.raw_value == raw_price
