@@ -2,6 +2,7 @@ import pytest
 
 from catalog_normalizer.normalizers import (
     NormalizationError,
+    normalize_inventory,
     normalize_missing_value,
     normalize_price,
 )
@@ -70,3 +71,21 @@ def test_normalize_price_rejects_unsupported_formats(
         normalize_price(value)
 
     assert exc_info.value.code == "invalid_price"
+
+
+@pytest.mark.parametrize(
+    ("raw_inventory", "expected"),
+    [
+        ("0", "0"),
+        ("12", "12"),
+        ("0012", "12"),
+        ("12.0", "12"),
+        ("12.00", "12"),
+        ("000.000", "0"),
+    ],
+)
+def test_normalize_inventory_supports_whole_number_formats(
+    raw_inventory: str,
+    expected: str,
+) -> None:
+    assert normalize_inventory(raw_inventory) == expected

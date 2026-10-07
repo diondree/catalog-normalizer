@@ -672,3 +672,99 @@ def test_unsupported_price_formats_are_rejected(
     assert error.field == "price"
     assert error.code == "invalid_price"
     assert error.raw_value == raw_price
+
+
+@pytest.mark.parametrize(
+    ("raw_inventory", "expected_inventory"),
+    [
+        ("0", 0),
+        ("12", 12),
+        ("0012", 12),
+        (" 12 ", 12),
+        ("12.0", 12),
+        ("12.00", 12),
+        ("1000", 1000),
+    ],
+)
+def test_supported_inventory_formats_are_accepted(
+    tmp_path: Path,
+    raw_inventory: str,
+    expected_inventory: int,
+) -> None:
+    csv_file = tmp_path / "products.csv"
+
+    csv_file.write_text(
+        (
+            "Item Code,Product Desc,Retail Price,Qty\n"
+            f'MAG001,Magnesium Citrate,42.95,"{raw_inventory}"\n'
+        ),
+        encoding="utf-8",
+    )
+
+    result = Normalizer().process(
+        csv_file,
+        mappings={
+            "Item Code": "sku",
+            "Product Desc": "name",
+            "Retail Price": "price",
+            "Qty": "inventory",
+        },
+    )
+
+    assert result.summary is not None
+    assert result.summary.valid_rows == 1
+    assert result.summary.rejected_rows == 0
+
+    assert result.valid_records[0].inventory == expected_inventory
+
+
+@pytest.mark.parametrize(
+    "raw_inventory",
+    [
+        "-0",
+        "+12",
+        "12.5",
+        ".5",
+        "12.",
+        "1e3",
+        "NaN",
+        "Infinity",
+        "1_000",
+        "twelve",
+    ],
+)
+def test_unsupported_inventory_formats_are_rejected(
+    tmp_path: Path,
+    raw_inventory: str,
+) -> None:
+    csv_file = tmp_path / "products.csv"
+
+    csv_file.write_text(
+        (
+            "Item Code,Product Desc,Retail Price,Qty\n"
+            f'MAG001,Magnesium Citrate,42.95,"{raw_inventory}"\n'
+        ),
+        encoding="utf-8",
+    )
+
+    result = Normalizer().process(
+        csv_file,
+        mappings={
+            "Item Code": "sku",
+            "Product Desc": "name",
+            "Retail Price": "price",
+            "Qty": "inventory",
+        },
+    )
+
+    assert result.summary is not None
+    assert result.summary.valid_rows == 0
+    assert result.summary.rejected_rows == 1
+
+    assert len(result.errors) == 1
+
+    error = result.errors[0]
+
+    assert error.field == "inventory"
+    assert error.code == "invalid_inventory"
+    assert error.raw_value == raw_inventory
