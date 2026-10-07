@@ -3,6 +3,10 @@ from collections.abc import Callable, Collection
 
 PRICE_PATTERN = re.compile(r"^\$?(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?$")
 
+INVENTORY_PATTERN = re.compile(r"^\d+(?:\.0+)?$")
+
+NEGATIVE_INVENTORY_PATTERN = re.compile(r"^-\d+(?:\.0+)?$")
+
 
 def normalize_missing_value(
     value: str | None,
@@ -46,14 +50,53 @@ def normalize_price(
     return normalized.replace(",", "")
 
 
+def normalize_inventory(
+    value: str | None,
+    missing_values: Collection[str] = (),
+) -> str | None:
+    normalized = normalize_missing_value(
+        value,
+        missing_values,
+    )
+
+    if normalized is None:
+        return None
+
+    if NEGATIVE_INVENTORY_PATTERN.fullmatch(normalized):
+        unsigned_value = normalized[1:]
+        integer_part = unsigned_value.split(".", 1)[0]
+
+        if int(integer_part) > 0:
+            raise NormalizationError(
+                code="negative_inventory",
+                message="Inventory cannot be negative.",
+            )
+
+        raise NormalizationError(
+            code="invalid_inventory",
+            message="Invalid inventory value.",
+        )
+
+    if INVENTORY_PATTERN.fullmatch(normalized) is None:
+        raise NormalizationError(
+            code="invalid_inventory",
+            message="Invalid inventory value.",
+        )
+
+    integer_part = normalized.split(".", 1)[0]
+
+    return str(int(integer_part))
+
+
 FieldNormalizer = Callable[
     [str | None, Collection[str]],
     str | None,
 ]
 
 
-FIELD_NORMALIZERS: dict[str, FieldNormalizer] = {
+FIELD_NORMALIZERS = {
     "price": normalize_price,
+    "inventory": normalize_inventory,
 }
 
 

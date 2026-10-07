@@ -353,6 +353,43 @@ is ambiguous.
 
 ---
 
+## Inventory Formatting
+
+v0.1 accepts non-negative whole-number inventory values.
+
+Supported examples include:
+
+- `0`
+- `12`
+- `0012`
+- `12.0`
+- `12.00`
+- `1000`
+
+Whole-number decimal representations such as `12.00` are normalized
+to integer inventory values.
+
+Leading and trailing whitespace is ignored.
+
+Unsupported representations are rejected with the stable error code
+`invalid_inventory`. Examples include:
+
+- `-0`
+- `+12`
+- `12.5`
+- `.5`
+- `12.`
+- `1e3`
+- `NaN`
+- `Infinity`
+- `1_000`
+- `twelve`
+
+Negative inventory values are rejected separately with the stable
+error code `negative_inventory`.
+
+---
+
 ## Current Limitations
 
 The project is intentionally small while the v0.1 API is being developed.
