@@ -768,3 +768,134 @@ def test_unsupported_inventory_formats_are_rejected(
     assert error.field == "inventory"
     assert error.code == "invalid_inventory"
     assert error.raw_value == raw_inventory
+
+
+def test_header_only_csv_produces_empty_summary(
+    tmp_path: Path,
+) -> None:
+    csv_file = tmp_path / "products.csv"
+
+    csv_file.write_text(
+        "Item Code,Product Desc,Retail Price,Qty,Legacy Code\n",
+        encoding="utf-8",
+    )
+
+    result = Normalizer().process(
+        csv_file,
+        mappings={
+            "Item Code": "sku",
+            "Product Desc": "name",
+            "Retail Price": "price",
+            "Qty": "inventory",
+        },
+    )
+
+    assert result.summary is not None
+
+    assert result.summary.rows_processed == 0
+    assert result.summary.valid_rows == 0
+    assert result.summary.rejected_rows == 0
+    assert result.summary.warned_rows == 0
+
+    assert result.summary.detected_columns == (
+        "Item Code",
+        "Product Desc",
+        "Retail Price",
+        "Qty",
+        "Legacy Code",
+    )
+
+    assert result.summary.unused_columns == ("Legacy Code",)
+
+    assert result.valid_records == []
+    assert result.errors == []
+    assert result.warnings == []
+
+
+def test_summary_remains_consistent_with_mixed_row_outcomes(
+    tmp_path: Path,
+) -> None:
+    csv_file = tmp_path / "products.csv"
+
+    csv_file.write_text(
+        (
+            "Item Code,Product Desc,Retail Price,Qty,Legacy Code\n"
+            "MAG001,Magnesium Citrate,42.95,17,X1\n"
+            "VIT002,Vitamin D3,N/A,NULL,X2\n"
+            ",Zinc,21.50,4,X3\n"
+            "OMEGA004,Omega 3,invalid,8,X4\n"
+            "CAL005,Calcium,0,0,X5\n"
+        ),
+        encoding="utf-8",
+    )
+
+    normalizer = Normalizer(
+        config=NormalizerConfig(
+            missing_values={"N/A", "NULL"},
+        )
+    )
+
+    result = normalizer.process(
+        csv_file,
+        mappings={
+            "Item Code": "sku",
+            "Product Desc": "name",
+            "Retail Price": "price",
+            "Qty": "inventory",
+        },
+    )
+
+    assert result.summary is not None
+
+    summary = result.summary
+
+    assert summary.rows_processed == 5
+    assert summary.valid_rows == 3
+    assert summary.rejected_rows == 2
+    assert summary.warned_rows == 1
+
+    assert len(result.valid_records) == 3
+    assert len(result.errors) == 2
+    assert len(result.warnings) == 2
+
+    assert summary.rows_processed == (summary.valid_rows + summary.rejected_rows)
+
+    assert summary.warned_rows <= summary.valid_rows
+
+    assert summary.unused_columns == ("Legacy Code",)
+
+
+def test_summary_handles_all_rejected_rows(
+    tmp_path: Path,
+) -> None:
+    csv_file = tmp_path / "products.csv"
+
+    csv_file.write_text(
+        (
+            "Item Code,Product Desc,Retail Price,Qty\n"
+            ",Magnesium Citrate,42.95,17\n"
+            "VIT002,Vitamin D3,invalid,8\n"
+        ),
+        encoding="utf-8",
+    )
+
+    result = Normalizer().process(
+        csv_file,
+        mappings={
+            "Item Code": "sku",
+            "Product Desc": "name",
+            "Retail Price": "price",
+            "Qty": "inventory",
+        },
+    )
+
+    assert result.summary is not None
+
+    assert result.summary.rows_processed == 2
+    assert result.summary.valid_rows == 0
+    assert result.summary.rejected_rows == 2
+    assert result.summary.warned_rows == 0
+
+    assert result.valid_records == []
+    assert len(result.errors) == 2
+    assert result.warnings == []

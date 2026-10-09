@@ -188,6 +188,48 @@ can identify source data that was intentionally or accidentally left unmapped.
 
 ---
 
+## Processing Summary
+
+Every completed import returns a `ProcessingSummary` containing:
+
+- `rows_processed`: total number of product rows processed
+- `valid_rows`: number of successfully validated products
+- `rejected_rows`: number of rejected product rows
+- `warned_rows`: number of valid rows containing at least one warning
+- `detected_columns`: source columns detected in the CSV
+- `unused_columns`: source columns not included in the mapping
+
+The summary maintains the following guarantees:
+
+```python
+rows_processed == valid_rows + rejected_rows
+warned_rows <= valid_rows
+```
+
+A row may produce multiple errors or warnings, but each row is
+counted only once in the corresponding summary totals.
+
+### Empty Imports
+
+A CSV containing headers but no product rows produces a summary
+with zero processed, valid, rejected, and warned rows.
+
+Detected and unused columns are still reported.
+
+### Partial and Complete Failures
+
+Imports containing both valid and invalid products report their
+outcomes separately.
+
+An import where every product is rejected still returns a
+`NormalizationResult` containing structured errors and an accurate
+summary.
+
+Rejected rows are excluded from `valid_records`, and warnings are
+only emitted for successfully validated rows.
+
+---
+
 ## Partial Failure
 
 A malformed row does not cause the entire import to fail.
