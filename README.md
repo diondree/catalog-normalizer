@@ -1168,7 +1168,8 @@ The core v0.1.0 functionality is implemented and undergoing final release valida
 - Wheel and source-distribution builds
 - Clean-environment package installation
 - Package metadata validation
-- MIT licensing
+- MIT licensing 
+- Changelog preparation
 
 ### Remaining Release Preparation
 
@@ -1288,3 +1289,7 @@ The two projects are designed to complement each other without coupling the publ
 `catalog-normalizer` is released under the MIT License.
 
 See [LICENSE](LICENSE) for the full license text.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
