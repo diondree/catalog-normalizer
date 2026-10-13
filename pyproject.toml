@@ -3,12 +3,36 @@ name = "catalog-normalizer"
 version = "0.1.0"
 description = "Fault-tolerant normalization and validation for messy product CSV data"
 readme = "README.md"
-authors = [{ name = "Diondre Edwards", email = "diondredev@gmail.com" }]
+
 requires-python = ">=3.13"
-dependencies = ["pydantic>=2.13.5"]
+
+license = "MIT"
+license-files = ["LICENSE"]
+
+authors = [{ name = "Diondre Edwards", email = "diondredev@gmail.com" }]
+
+keywords = [
+  "catalog",
+  "products",
+  "csv",
+  "normalization",
+  "data-validation",
+  "inventory",
+]
+
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = ["pydantic>=2.13.5,<3"]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
@@ -30,3 +54,8 @@ select = ["E", "F", "I", "UP", "B"]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
 include = ["src", "tests"]
+
+[project.urls]
+Homepage = "https://github.com/diondree/catalog-normalizer"
+Repository = "https://github.com/diondree/catalog-normalizer"
+Issues = "https://github.com/diondree/catalog-normalizer/issues"

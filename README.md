@@ -578,3 +578,9 @@ catalog-normalizer/
 Commercial concerns such as authentication, multi-tenancy, persistence, asynchronous jobs, external integrations, billing, and customer-specific workflows will remain outside this package.
 
 This keeps the library reusable and its responsibilities clear.
+
+## License
+
+catalog-normalizer is released under the MIT License.
+
+See [LICENSE](LICENSE) for the full license text.

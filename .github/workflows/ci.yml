@@ -60,6 +60,12 @@ jobs:
       - name: Build package
         run: uv build
 
+      - name: Build package
+        run: uv build
+
+      - name: Validate distribution metadata
+        run: uvx twine check dist/*
+
       - name: Create clean environment
         run: uv venv --python 3.13 .package-test
 
