@@ -99,27 +99,33 @@ The library follows a simple principle:
 
 ## Installation
 
-### Requirements
+Requires Python 3.13 or newer.
 
-- Python 3.13 or newer
-
-### Install from GitHub
-
-Until the package is published to PyPI, it can be installed directly from the public GitHub repository:
-
-```bash
-python -m pip install "git+https://github.com/diondree/catalog-normalizer.git"
-```
-
-Once an official PyPI release is available, installation will use:
+Install from PyPI:
 
 ```bash
 pip install catalog-normalizer
 ```
 
-> The PyPI installation command is not available until the package has been published.
+Or install a specific version:
 
-For developers contributing to the library, see [Development Setup](#development-setup).
+```bash
+pip install catalog-normalizer==0.1.0
+```
+
+Using uv:
+
+```bash
+uv add catalog-normalizer
+```
+
+### Install from GitHub
+
+You can also install directly from a tagged GitHub release:
+
+```bash
+pip install "git+https://github.com/diondree/catalog-normalizer.git@v0.1.0"
+```
 
 ---
 
