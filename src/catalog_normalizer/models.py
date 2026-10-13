@@ -16,6 +16,11 @@ NonNegativeInventory = Annotated[
     Field(ge=0),
 ]
 
+NonNegativePrice = Annotated[
+    Decimal,
+    Field(ge=0),
+]
+
 
 class ProductSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -25,7 +30,7 @@ class ProductSchema(BaseModel):
     description: str | None = None
     brand: str | None = None
     category: str | None = None
-    price: Decimal | None = None
+    price: NonNegativePrice | None = None
     currency: str | None = None
     inventory: NonNegativeInventory | None = None
     status: str | None = None

@@ -60,6 +60,12 @@ jobs:
       - name: Build package
         run: uv build
 
+      - name: Build package
+        run: uv build
+
+      - name: Validate distribution metadata
+        run: uvx twine check dist/*
+
       - name: Create clean environment
         run: uv venv --python 3.13 .package-test
 
@@ -68,6 +74,9 @@ jobs:
           uv pip install
           --python .package-test/bin/python
           dist/*.whl
+      
+      - name: Verify README Quick Start
+        run: .package-test/bin/python scripts/check_readme_quickstart.py
 
       - name: Smoke test installed package
         run: |

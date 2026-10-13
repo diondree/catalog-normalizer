@@ -1,67 +1,229 @@
 # catalog-normalizer
 
-A small Python library for transforming messy product CSV files into predictable, validated product records.
+A lightweight Python library for transforming messy product CSV files into predictable, validated product records.
 
-`catalog-normalizer` is being built as the normalization engine behind a larger Product & Inventory Sync platform, while remaining generic enough to be useful independently.
+`catalog-normalizer` provides deterministic data normalization, explicit column mapping, structured validation errors, and fault-tolerant CSV processing.
 
-> Status: early v0.1 development
+The library is designed to be useful independently while serving as the normalization foundation for a larger Product & Inventory Sync platform.
 
----
+> **Status:** v0.1.0 release candidate. Core functionality is implemented and undergoing final release validation.
 
 ## Why?
 
-Product data often arrives in inconsistent formats:
+Product data often arrives in inconsistent formats.
+
+One system might export:
 
 ```csv
 Item Code,Product Desc,Retail Price,Qty
 MAG001,Magnesium Citrate,42.99,17
 ```
 
-Another system might call the same fields:
+Another system might use:
 
 ```csv
 SKU,Name,Price,Inventory
 MAG001,Magnesium Citrate,42.99,17
 ```
 
-`catalog-normalizer` allows callers to explicitly map external columns into a canonical product schema, normalize values, validate each row, and collect errors without throwing away valid records because another row failed.
+Beyond inconsistent column names, real-world product data frequently contains:
+
+- missing or incomplete values
+- inconsistent monetary formatting
+- invalid inventory quantities
+- unexpected whitespace
+- ambiguous numeric representations
+- malformed individual records
+- source-specific missing-value markers
+
+Applications importing this data need a predictable way to transform it without silently introducing incorrect information.
+
+`catalog-normalizer` allows callers to explicitly map external columns into a canonical product schema, normalize supported values, validate individual rows, and collect structured errors.
+
+**A malformed product should not cause an entire catalog import to fail.**
+
+The library follows a simple principle:
+
+> Normalize what we understand. Reject what we don't. Never silently invent meaning.
 
 ---
 
-## Current Features
+## Features
 
-The current implementation supports:
+### Data Processing
 
-- CSV processing
-- explicit source-to-canonical column mappings
-- canonical product validation with Pydantic
-- required, non-blank product SKU and name
-- whitespace cleanup
-- blank optional values normalized to `None`
-- partial failure
-- processing summaries
-- CSV input is parsed incrementally rather than loading the entire source file into memory
-- US-style price normalization for supported monetary formats
-- conservative rejection of ambiguous price formats
-- row-level validation errors with stable machine-readable error codes
-- non-negative integer inventory validation
-- stable `negative_inventory` and `invalid_inventory` error codes 
-- configurable missing-value markers such as `N/A` and `NULL`
-- warnings for configured missing-value markers normalized to `None`
-- processing summaries distinguish valid, warned, and rejected rows
-- detected and unused CSV columns reported in processing summaries
-- automated formatting, linting, type checking, tests, and coverage reporting in CI
-- wheel and source-distribution build validation
-- clean-environment installation and package smoke testing in CI
+- CSV processing with incremental source reading
+- Explicit source-to-canonical column mappings
+- Canonical product validation using Pydantic
+- Required, non-blank product SKU and name
+- Whitespace normalization
+- Blank optional values normalized to `None`
+- Configurable missing-value markers
+- Conservative US-style price normalization
+- Whole-number inventory normalization
+
+### Validation and Reliability
+
+- Fault-tolerant row processing
+- Valid records preserved when other rows fail
+- Structured row-level validation errors
+- Stable machine-readable error codes
+- Explicit rejection of ambiguous monetary formats
+- Non-negative inventory validation
+- Warnings for configured missing-value normalization
+- Original source values preserved in errors and warnings
+
+### Reporting
+
+- Total rows processed
+- Valid and rejected row counts
+- Number of rows containing warnings
+- Detected source columns
+- Unused source columns
+- Multiple errors or warnings supported per row
+
+### Engineering
+
+- Python 3.13+
+- Pydantic 2
+- Type checking with Pyright
+- Formatting and linting with Ruff
+- Automated tests with pytest
+- Minimum 90% test coverage enforced in CI
+- GitHub Actions quality checks
+- Wheel and source-distribution builds
+- Distribution metadata validation
+- Clean-environment package installation and smoke testing
+
+---
+
+## Installation
+
+### Requirements
+
+- Python 3.13 or newer
+
+### Install from GitHub
+
+Until the package is published to PyPI, it can be installed directly from the public GitHub repository:
+
+```bash
+python -m pip install "git+https://github.com/diondree/catalog-normalizer.git"
+```
+
+Once an official PyPI release is available, installation will use:
+
+```bash
+pip install catalog-normalizer
+```
+
+> The PyPI installation command is not available until the package has been published.
+
+For developers contributing to the library, see [Development Setup](#development-setup).
+
+---
+
+## Quick Start
+
+### 1. Create a CSV file
+
+Create a file named `products.csv`:
+
+```csv
+Item Code,Product Desc,Retail Price,Qty,Brand
+MAG001,Magnesium Citrate,42.99,17,NOW Foods
+VIT002,Vitamin D3,38.50,8,Solgar
+```
+
+### 2. Normalize the products
+
+Create a Python script in the same directory:
+
+```python
+from catalog_normalizer import Normalizer
+
+normalizer = Normalizer()
+
+result = normalizer.process(
+    "products.csv",
+    mappings={
+        "Item Code": "sku",
+        "Product Desc": "name",
+        "Retail Price": "price",
+        "Qty": "inventory",
+        "Brand": "brand",
+    },
+)
+
+# Successfully normalized products
+for product in result.valid_records:
+    print(
+        product.sku,
+        product.name,
+        product.price,
+        product.inventory,
+    )
+
+# Validation errors
+for error in result.errors:
+    print(f"Row {error.row_number}: {error.code} - {error.message}")
+
+# Non-fatal warnings
+for warning in result.warnings:
+    print(f"Row {warning.row_number}: {warning.code}")
+
+# Processing summary
+assert result.summary is not None
+
+print(f"Processed: {result.summary.rows_processed}")
+print(f"Valid: {result.summary.valid_rows}")
+print(f"Rejected: {result.summary.rejected_rows}")
+```
+
+### 3. Inspect the results
+
+The products are converted into validated `ProductSchema` instances.
+
+For the example CSV, the summary is:
+
+```text
+Processed: 2
+Valid: 2
+Rejected: 0
+```
+
+Each product contains canonical field names and validated values.
+
+For example:
+
+```python
+product = result.valid_records[0]
+
+print(product.sku)
+# MAG001
+
+print(product.name)
+# Magnesium Citrate
+
+print(product.price)
+# Decimal('42.99')
+
+print(product.inventory)
+# 17
+```
+
+The `price` field uses Python's `Decimal` type rather than a floating-point number.
 
 ---
 
 ## Canonical Product Model
 
-The current product schema contains:
+All successfully normalized products conform to `ProductSchema`.
+
+The current schema contains:
 
 | Field | Type | Required |
-|---|---|---:|
+|---|---|---|
 | `sku` | `str` | Yes |
 | `name` | `str` | Yes |
 | `description` | `str \| None` | No |
@@ -72,73 +234,54 @@ The current product schema contains:
 | `inventory` | `int \| None` | No |
 | `status` | `str \| None` | No |
 
----
+### Required Fields
 
-## Development Setup
+Both `sku` and `name` must contain non-blank strings.
 
-This project uses Python 3.13+ and `uv`.
+Leading and trailing whitespace is removed.
 
-Clone the repository and install the project dependencies:
+For example:
 
-```bash
-uv sync
+```text
+"  MAG001  " → "MAG001"
 ```
 
-Run the test suite:
+Empty or whitespace-only values are invalid for required fields.
 
-```bash
-uv run pytest -v
-```
+### Optional Fields
 
----
+Optional fields may contain `None`.
 
-## Quick Start
-
-Given a CSV such as:
-
-```csv
-Item Code,Product Desc,Retail Price,Qty,Brand
-MAG001,Magnesium Citrate,42.99,17,NOW Foods
-VIT002,Vitamin D3,38.50,8,Solgar
-```
-
-process it using explicit mappings:
+For example:
 
 ```python
-from catalog_normalizer import Normalizer
-
-normalizer = Normalizer()
-
-result = normalizer.process(
-    "examples/products.csv",
-    mappings={
-        "Item Code": "sku",
-        "Product Desc": "name",
-        "Retail Price": "price",
-        "Qty": "inventory",
-        "Brand": "brand",
-    },
-)
-
-for product in result.valid_records:
-    print(product)
-
-for error in result.errors:
-    print(
-        error.row_number,
-        error.field,
-        error.code,
-        error.message,
-    )
-
-print(result.summary)
+{
+    "sku": "MAG001",
+    "name": "Magnesium Citrate",
+    "price": None,
+    "inventory": None,
+}
 ```
+
+This is a valid canonical product.
+
+### Price and Inventory
+
+Prices are represented using `Decimal`.
+
+Inventory quantities are represented using non-negative integers.
+
+The CSV processing pipeline applies additional field-specific formatting rules before performing canonical model validation.
+
+These rules are documented in [Price Formatting](#price-formatting) and [Inventory Formatting](#inventory-formatting).
 
 ---
 
 ## Column Mapping
 
-Mappings are explicitly supplied by the caller.
+Column mappings are supplied explicitly by the caller.
+
+For example:
 
 ```python
 mappings = {
@@ -149,18 +292,52 @@ mappings = {
 }
 ```
 
-The keys represent columns in the incoming CSV.
+The mapping keys represent columns in the incoming CSV.
 
-The values represent fields in the canonical product schema.
+The mapping values represent fields in the canonical product schema.
 
-Explicit mappings keep normalization predictable and avoid making assumptions about external product data.
+This transforms data such as:
+
+```csv
+Item Code,Product Desc,Retail Price,Qty
+MAG001,Magnesium Citrate,42.99,17
+```
+
+into canonical fields:
+
+```python
+{
+    "sku": "MAG001",
+    "name": "Magnesium Citrate",
+    "price": "42.99",
+    "inventory": "17",
+}
+```
+
+The mapped values are subsequently normalized and validated into their canonical types.
+
+### Mapping Validation
+
+Mappings are validated before product rows are processed.
+
+The normalizer rejects:
+
+- unsupported canonical field names
+- multiple source columns mapped to the same canonical field
+- mappings missing required canonical fields
+- mappings referencing source columns absent from the CSV
+
+Invalid mappings raise `ValueError`.
+
+Explicit mappings prevent the library from making assumptions about external product data.
+
+Automatic column detection is not currently supported.
 
 ---
 
 ## Column Reporting
 
-Processing summaries report both the columns detected in the source CSV
-and any columns that were not mapped.
+Processing summaries report both detected CSV columns and columns that were not mapped.
 
 For example, given:
 
@@ -169,7 +346,7 @@ Item Code,Product Desc,Retail Price,Qty,Internal Notes
 MAG001,Magnesium Citrate,42.95,12,Top seller
 ```
 
-with no mapping for `Internal Notes`, the summary contains:
+With no mapping for `Internal Notes`, the summary contains:
 
 ```python
 result.summary.detected_columns == (
@@ -179,60 +356,95 @@ result.summary.detected_columns == (
     "Qty",
     "Internal Notes",
 )
+```
 
+And:
+
+```python
 result.summary.unused_columns == ("Internal Notes",)
 ```
 
-Unused columns do not cause the import to fail. They are reported so callers
-can identify source data that was intentionally or accidentally left unmapped.
+Unused columns do not cause the import to fail.
+
+They are reported so callers can identify source data that was intentionally or accidentally left unmapped.
+
+Both properties preserve the original source column order.
 
 ---
 
 ## Processing Summary
 
-Every completed import returns a `ProcessingSummary` containing:
+Every successfully completed import returns a `NormalizationResult` containing a `ProcessingSummary`.
 
-- `rows_processed`: total number of product rows processed
-- `valid_rows`: number of successfully validated products
-- `rejected_rows`: number of rejected product rows
-- `warned_rows`: number of valid rows containing at least one warning
-- `detected_columns`: source columns detected in the CSV
-- `unused_columns`: source columns not included in the mapping
+The summary includes:
 
-The summary maintains the following guarantees:
+| Property | Description |
+|---|---|
+| `rows_processed` | Total number of product rows processed |
+| `valid_rows` | Number of successfully validated products |
+| `rejected_rows` | Number of rejected product rows |
+| `warned_rows` | Number of valid rows containing at least one warning |
+| `detected_columns` | Columns detected in the source CSV |
+| `unused_columns` | Source columns not included in the mapping |
+
+### Summary Guarantees
+
+For every completed import:
 
 ```python
 rows_processed == valid_rows + rejected_rows
+```
+
+And:
+
+```python
 warned_rows <= valid_rows
 ```
 
-A row may produce multiple errors or warnings, but each row is
-counted only once in the corresponding summary totals.
+A row may produce multiple errors or warnings.
+
+However, each row is counted only once in the corresponding summary totals.
+
+For example:
+
+```text
+Rows processed: 5
+Valid rows:     3
+Rejected rows:  2
+Warned rows:    1
+
+Error objects:   2
+Warning objects: 2
+```
+
+A single valid row can produce two warnings while contributing only one to `warned_rows`.
 
 ### Empty Imports
 
-A CSV containing headers but no product rows produces a summary
-with zero processed, valid, rejected, and warned rows.
+A CSV containing headers but no product rows produces a summary with:
+
+```text
+Rows processed: 0
+Valid rows:     0
+Rejected rows:  0
+Warned rows:    0
+```
 
 Detected and unused columns are still reported.
 
-### Partial and Complete Failures
+### Complete Failures
 
-Imports containing both valid and invalid products report their
-outcomes separately.
+An import where every product row is rejected still returns a `NormalizationResult`.
 
-An import where every product is rejected still returns a
-`NormalizationResult` containing structured errors and an accurate
-summary.
+Its `valid_records` collection will be empty, while `errors` and `summary` describe the failed import.
 
-Rejected rows are excluded from `valid_records`, and warnings are
-only emitted for successfully validated rows.
+A CSV without a header row is handled differently: it raises `ValueError` because the file cannot be processed using column mappings.
 
 ---
 
 ## Partial Failure
 
-A malformed row does not cause the entire import to fail.
+A malformed product row does not cause the entire import to fail.
 
 For example:
 
@@ -243,9 +455,9 @@ MAG001,Magnesium Citrate,42.99,17
 ZINC003,Zinc,21.50,4
 ```
 
-The second row is invalid because the SKU is missing.
+The second product is invalid because its SKU is missing.
 
-The expected result is:
+The expected summary is:
 
 ```text
 Rows processed: 3
@@ -259,17 +471,31 @@ The two valid products remain available in:
 result.valid_records
 ```
 
-while validation problems are available in:
+Validation problems are available in:
 
 ```python
 result.errors
 ```
 
+This behavior allows applications to retain valid products while presenting actionable feedback about rejected records.
+
 ---
 
 ## Structured Errors
 
-Validation errors contain useful information about the failed row:
+Validation errors are represented using `RowError`.
+
+Each error contains:
+
+| Property | Description |
+|---|---|
+| `row_number` | Row number associated with the rejected record |
+| `field` | Canonical field associated with the error, when available |
+| `code` | Machine-readable error identifier |
+| `message` | Human-readable explanation |
+| `raw_value` | Original source value associated with the error |
+
+For example:
 
 ```python
 RowError(
@@ -281,16 +507,27 @@ RowError(
 )
 ```
 
-Errors are designed to eventually be useful to both:
+The original source value is preserved rather than replaced with an intermediate normalized value.
 
-- developers consuming the library
-- user interfaces explaining import problems to business users
+### Stable Error Codes
+
+Field-specific error codes currently include:
+
+| Code | Meaning |
+|---|---|
+| `invalid_price` | Unsupported or invalid price representation |
+| `invalid_inventory` | Unsupported or invalid inventory representation |
+| `negative_inventory` | Inventory quantity is negative |
+
+Other schema validation failures use the corresponding Pydantic validation error codes.
+
+These structured errors are intended to support both developer workflows and user interfaces explaining import problems.
 
 ---
 
 ## Missing Values
 
-Blank or whitespace-only CSV values are currently normalized to `None`.
+Blank or whitespace-only CSV values are normalized to `None`.
 
 For example:
 
@@ -299,7 +536,7 @@ Item Code,Product Desc,Retail Price,Qty
 MAG001,Magnesium Citrate,,
 ```
 
-becomes conceptually:
+Becomes conceptually:
 
 ```python
 {
@@ -314,16 +551,88 @@ Because `price` and `inventory` are optional, the product remains valid.
 
 Required fields such as `sku` and `name` cannot be blank.
 
+### Configurable Missing-Value Markers
+
+External systems may represent missing values using strings such as:
+
+```text
+N/A
+NULL
+```
+
+These markers can be configured explicitly:
+
+```python
+from catalog_normalizer import (
+    Normalizer,
+    NormalizerConfig,
+)
+
+normalizer = Normalizer(
+    config=NormalizerConfig(
+        missing_values={"N/A", "NULL"},
+    )
+)
+```
+
+Configured markers are normalized to `None`.
+
+For example:
+
+```csv
+Item Code,Product Desc,Retail Price,Qty
+MAG001,Magnesium Citrate,N/A,NULL
+```
+
+Results in a valid product containing:
+
+```python
+{
+    "price": None,
+    "inventory": None,
+}
+```
+
+### Matching Rules
+
+Configured missing-value matching is currently case-sensitive.
+
+For example:
+
+```text
+Configured marker: N/A
+Incoming value:    N/A
+Result:            None
+```
+
+However:
+
+```text
+Configured marker: N/A
+Incoming value:    n/a
+Result:            Not treated as a configured missing marker
+```
+
+Leading and trailing whitespace is ignored when matching markers.
+
+The original source values remain available in warning records.
+
 ---
 
 ## Warnings
 
-Some normalization behavior preserves a valid row while still reporting
-that source data was changed.
+Warnings describe non-fatal normalization decisions made for otherwise valid rows.
 
-For example, if `N/A` is explicitly configured as a missing-value marker:
+Configured missing-value markers produce a warning when converted to `None`.
+
+For example:
 
 ```python
+from catalog_normalizer import (
+    Normalizer,
+    NormalizerConfig,
+)
+
 normalizer = Normalizer(
     config=NormalizerConfig(
         missing_values={"N/A"},
@@ -331,14 +640,14 @@ normalizer = Normalizer(
 )
 ```
 
-then:
+Given:
 
 ```csv
 Item Code,Product Desc,Retail Price,Qty
 MAG001,Magnesium Citrate,N/A,12
 ```
 
-remains a valid product, but produces:
+The product remains valid, but the result contains:
 
 ```python
 RowWarning(
@@ -350,31 +659,62 @@ RowWarning(
 )
 ```
 
-Ordinary blank optional values are normalized to `None` without producing
-a warning.
+### Warning Behavior
+
+Warnings follow these rules:
+
+- Warnings are emitted only for successfully validated rows.
+- Rejected rows do not also produce missing-value warnings.
+- Ordinary blank optional values do not produce warnings.
+- Unused or unmapped CSV columns do not produce warnings.
+- Multiple warnings may be produced for one valid row.
+- `warned_rows` counts rows containing warnings, not warning objects.
+- `raw_value` preserves the original source text.
+- Configured missing-value matching is case-sensitive.
+
+For example, a single product containing three configured missing markers may produce:
+
+```text
+Valid rows:   1
+Warned rows:  1
+
+Warnings:     3
+```
+
+This distinction makes warning reporting predictable for applications consuming the library.
 
 ---
 
 ## Price Formatting
 
-v0.1 supports a deliberately narrow set of unambiguous US-style
-monetary formats.
+v0.1 supports a deliberately narrow set of unambiguous US-style monetary formats.
 
-Supported examples include:
+### Supported Formats
 
-- `0`
-- `42`
-- `42.95`
-- `$42.95`
-- `1,299`
-- `1,299.99`
-- `$1,299.99`
-- `1,000,000.00`
+Examples include:
+
+| Input | Normalized Value |
+|---|---|
+| `0` | `0` |
+| `0.00` | `0.00` |
+| `$0.00` | `0.00` |
+| `42` | `42` |
+| `42.95` | `42.95` |
+| `$42.95` | `42.95` |
+| `1,299` | `1299` |
+| `1,299.99` | `1299.99` |
+| `$1,299.99` | `1299.99` |
+| `1,000,000.00` | `1000000.00` |
 
 Leading and trailing whitespace is ignored.
 
-Unsupported or ambiguous formats are rejected rather than interpreted
-automatically. Examples include:
+Prices are ultimately validated into Python `Decimal` values.
+
+### Unsupported Formats
+
+Unsupported or ambiguous formats are rejected rather than interpreted automatically.
+
+Examples include:
 
 - `42.`
 - `.95`
@@ -388,10 +728,35 @@ automatically. Examples include:
 - `Infinity`
 - `1_000.00`
 
-Unsupported values produce the stable error code `invalid_price`.
+Unsupported values produce the stable error code:
 
-The normalizer intentionally avoids guessing when monetary formatting
-is ambiguous.
+```text
+invalid_price
+```
+
+The normalizer intentionally avoids guessing when monetary formatting is ambiguous.
+
+### Why Strict Formatting?
+
+Some numeric representations are technically accepted by Python's numeric types but are not appropriate for the library's supported CSV price contract.
+
+For example:
+
+```text
+1e3
+```
+
+Could be interpreted as:
+
+```text
+1000
+```
+
+However, `catalog-normalizer` does not silently make that interpretation.
+
+The normalization layer verifies supported textual representations before canonical type validation.
+
+This keeps the behavior explicit and predictable.
 
 ---
 
@@ -399,22 +764,34 @@ is ambiguous.
 
 v0.1 accepts non-negative whole-number inventory values.
 
-Supported examples include:
+### Supported Formats
 
-- `0`
-- `12`
-- `0012`
-- `12.0`
-- `12.00`
-- `1000`
+Examples include:
 
-Whole-number decimal representations such as `12.00` are normalized
-to integer inventory values.
+| Input | Normalized Value |
+|---|---|
+| `0` | `0` |
+| `12` | `12` |
+| `0012` | `12` |
+| `12.0` | `12` |
+| `12.00` | `12` |
+| `1000` | `1000` |
+
+Whole-number decimal representations such as `12.00` are accepted because spreadsheet exports commonly represent integer quantities this way.
 
 Leading and trailing whitespace is ignored.
 
-Unsupported representations are rejected with the stable error code
-`invalid_inventory`. Examples include:
+Inventory values are ultimately validated into Python integers.
+
+### Unsupported Formats
+
+Unsupported representations are rejected with:
+
+```text
+invalid_inventory
+```
+
+Examples include:
 
 - `-0`
 - `+12`
@@ -427,123 +804,382 @@ Unsupported representations are rejected with the stable error code
 - `1_000`
 - `twelve`
 
-Negative inventory values are rejected separately with the stable
-error code `negative_inventory`.
+### Negative Inventory
+
+Recognizable negative whole-number quantities are rejected separately.
+
+For example:
+
+```text
+-12
+```
+
+Produces:
+
+```text
+negative_inventory
+```
+
+With the message:
+
+```text
+Inventory cannot be negative.
+```
+
+This distinction separates unsupported textual representations from valid numeric representations that violate inventory domain rules.
 
 ---
 
-## Current Limitations
+## Public API
 
-The project is intentionally small while the v0.1 API is being developed.
+The package exposes the following classes from `catalog_normalizer`:
 
-The current implementation does not yet provide:
+| Class | Purpose |
+|---|---|
+| `Normalizer` | Processes and normalizes CSV product data |
+| `NormalizerConfig` | Configures normalization behavior |
+| `ProductSchema` | Defines the canonical product representation |
+| `NormalizationResult` | Contains validated records, errors, warnings, and summary |
+| `ProcessingSummary` | Describes the outcomes of a completed import |
+| `RowError` | Represents an individual normalization or validation error |
+| `RowWarning` | Represents a non-fatal normalization warning |
 
-- advanced inventory normalization
-- Excel/XLSX support
-- automatic column detection
-- AI-assisted mapping
-- database persistence
-- web APIs
-- retailer-specific rules
-- product deduplication
-- normalized records are currently accumulated in memory in `NormalizationResult`; a streaming result API is planned for larger workloads
+Example imports:
 
-These capabilities will be introduced incrementally as their behavior is defined and tested.
+```python
+from catalog_normalizer import (
+    Normalizer,
+    NormalizerConfig,
+    NormalizationResult,
+    ProcessingSummary,
+    ProductSchema,
+    RowError,
+    RowWarning,
+)
+```
+
+### Normalizer
+
+The primary entry point is:
+
+```python
+normalizer = Normalizer()
+```
+
+CSV processing is performed through:
+
+```python
+result = normalizer.process(
+    "products.csv",
+    mappings={
+        "Item Code": "sku",
+        "Product Desc": "name",
+    },
+)
+```
+
+The `process()` method accepts:
+
+- `file_path`: a string or `pathlib.Path` pointing to a CSV file
+- `mappings`: an explicit mapping of source columns to canonical fields
+
+The constructor also supports an optional `NormalizerConfig` and a custom `ProductSchema` subclass.
+
+### NormalizationResult
+
+A completed import returns:
+
+```python
+NormalizationResult(
+    valid_records=[...],
+    errors=[...],
+    warnings=[...],
+    summary=...,
+)
+```
+
+The `summary` property is populated for successfully completed processing operations.
+
+Invalid CSV headers, mappings, or file access failures may raise exceptions instead of producing a completed result.
+
+### Extensibility
+
+Consumers can supply subclasses of `ProductSchema` when additional canonical fields or validation requirements are needed.
+
+Field-specific normalization currently follows the library's supported normalization rules.
+
+Additional custom normalization behavior is outside the v0.1 public API.
 
 ---
 
-## Development Philosophy
+## Current Scope and Limitations
 
-The core library should remain:
+`catalog-normalizer` is intentionally focused on deterministic product-data normalization and validation.
 
-- boring
-- deterministic
-- explicit
-- testable
-- trustworthy
+It is not intended to become a complete commerce platform.
 
-Normalization should not silently guess when data is ambiguous.
+### Current Limitations
 
-The goal is to turn unreliable external product data into predictable application input while making assumptions and failures visible.
+The current implementation does not provide:
+
+- Excel/XLSX input support
+- Automatic column detection
+- AI-assisted column mapping
+- Product deduplication
+- Retailer-specific normalization rules
+- Configurable normalization pipelines
+- Streaming result consumption
+- Advanced inventory and location models
+
+### Memory Behavior
+
+CSV input is parsed incrementally rather than loading the entire source file into memory.
+
+However, successfully normalized records are accumulated in:
+
+```python
+NormalizationResult.valid_records
+```
+
+Therefore, total memory usage still grows with the number of accepted products.
+
+A streaming result API may be considered in a future release for larger workloads.
+
+### Outside the Library's Scope
+
+The following responsibilities belong to applications consuming the library:
+
+- Database persistence
+- Authentication and multi-tenancy
+- Product synchronization
+- Conflict resolution
+- Background job processing
+- External platform adapters
+- Billing and customer workflows
+- Web APIs
+
+These capabilities will be developed separately within the larger Product & Inventory Sync platform.
+
+Keeping these responsibilities separate allows `catalog-normalizer` to remain independently useful.
 
 ---
 
-## Testing
+## Development Setup
 
-Run all tests:
+This project uses Python 3.13+ and `uv`.
+
+### Clone the Repository
+
+```bash
+git clone https://github.com/diondree/catalog-normalizer.git
+
+cd catalog-normalizer
+```
+
+### Install Dependencies
+
+```bash
+uv sync
+```
+
+Dependencies are managed through `pyproject.toml` and `uv.lock`.
+
+The committed lockfile ensures reproducible dependency resolution for development and CI.
+
+### Run the Test Suite
 
 ```bash
 uv run pytest -v
 ```
 
-Stop on the first failure:
+### Formatting
+
+Format Python files:
+
+```bash
+uv run ruff format .
+```
+
+Check formatting without modifying files:
+
+```bash
+uv run ruff format --check .
+```
+
+### Linting
+
+```bash
+uv run ruff check .
+```
+
+### Type Checking
+
+```bash
+uv run pyright
+```
+
+---
+
+## Testing
+
+The project uses pytest for automated testing.
+
+### Run All Tests
+
+```bash
+uv run pytest -v
+```
+
+### Stop on the First Failure
 
 ```bash
 uv run pytest -x -v
 ```
 
-Run a specific test file:
+### Run a Specific Test File
 
 ```bash
 uv run pytest tests/test_normalizer.py -v
 ```
 
-Run coverage:
+### Run Coverage
 
 ```bash
-uv run pytest --cov=catalog_normalizer --cov-report=term-missing
+uv run pytest \
+  --cov=catalog_normalizer \
+  --cov-report=term-missing \
+  --cov-fail-under=90
 ```
 
-Large CSV behavior is covered by a regression test using a synthetic
-10,000-row catalog.
+The project enforces a minimum test coverage threshold of 90%.
 
-The current implementation reads CSV input incrementally, but accepted
-records are retained in `NormalizationResult`, so memory usage still grows
-with the number of accepted products.
+### Test Coverage Areas
+
+The test suite covers:
+
+- Explicit column mapping
+- Required canonical fields
+- Partial failure handling
+- Price normalization and edge cases
+- Inventory normalization and edge cases
+- Configurable missing-value markers
+- Structured validation errors
+- Warning generation
+- Warning count semantics
+- Empty imports
+- Mixed successful and rejected imports
+- Fully rejected imports
+- Detected and unused column reporting
+- Processing summary consistency
+- Large CSV processing
+
+Large-file behavior is covered by a regression test using a synthetic 10,000-row product catalog.
+
+The test verifies processing behavior but does not imply constant-memory result storage.
 
 ---
 
 ## Continuous Integration
 
-Every push and pull request runs the project quality gates through
-GitHub Actions.
+Every push and pull request runs automated quality checks through GitHub Actions.
 
-The CI pipeline currently verifies:
+The CI pipeline contains two primary jobs.
+
+### Quality
+
+The Quality job verifies:
 
 - Ruff formatting
 - Ruff linting
 - Pyright type checking
-- pytest
-- test coverage reporting with a minimum 90% coverage gate
-- wheel and source-distribution builds
-- clean-environment installation of the built wheel
-- smoke testing through the package's public API
+- pytest execution
+- Minimum 90% test coverage
 
-The same checks can be run locally:
+### Package
+
+The Package job verifies:
+
+- Wheel and source-distribution builds
+- Distribution metadata validation
+- Clean-environment wheel installation
+- Smoke testing through the installed package's public API
+- Execution of the documented Quick Start against the installed wheel
+
+These checks help detect both implementation regressions and packaging problems.
+
+### Documentation Verification
+
+The README Quick Start is tested automatically in CI.
+
+The verification script extracts the CSV and Python examples directly
+from the README, executes them in an isolated temporary directory,
+and verifies the expected processing summary.
+
+This ensures that the documented example continues to work against
+the installed package.
+
+To run the verification locally after building and installing the
+wheel into `.package-test`:
+
+```bash
+.package-test/bin/python scripts/check_readme_quickstart.py
+```
+
+### Run Checks Locally
 
 ```bash
 uv run ruff format --check .
+
 uv run ruff check .
+
 uv run pyright
-uv run pytest --cov=catalog_normalizer --cov-report=term-missing
+
+uv run pytest \
+  --cov=catalog_normalizer \
+  --cov-report=term-missing \
+  --cov-fail-under=90
+
+uv build
+
+uvx twine check dist/*
 ```
 
-CI installs dependencies from the committed `uv.lock` file so dependency
-resolution remains reproducible.
+CI installs project dependencies using the committed `uv.lock` file to maintain reproducibility.
 
 ---
 
-## Planned v0.1 Work
+## Release Status
 
-Upcoming work includes:
+The core v0.1.0 functionality is implemented and undergoing final release validation.
 
-1. additional inventory edge cases
-2. configurable missing-value handling
-3. additional price-format edge cases
-4. additional warning cases
-5. improved processing summaries
-6. larger-file tests
-7. tagged `v0.1.0` release
+### Completed Milestones
+
+- CSV processing
+- Explicit column mapping
+- Canonical product validation
+- Price formatting and validation
+- Inventory formatting and validation
+- Configurable missing-value handling
+- Structured errors and warnings
+- Processing summaries
+- Detected and unused column reporting
+- Large-file regression testing
+- Automated CI quality gates
+- Wheel and source-distribution builds
+- Clean-environment package installation
+- Package metadata validation
+- MIT licensing 
+- Changelog preparation
+
+### Remaining Release Preparation
+
+- Final documentation and example verification
+- Changelog preparation
+- Tagged `v0.1.0` GitHub release
+
+The project is currently classified as an alpha release.
+
+The public API may evolve as real-world usage identifies additional requirements.
 
 ---
 
@@ -551,19 +1187,28 @@ Upcoming work includes:
 
 ```text
 catalog-normalizer/
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+│
 ├── examples/
 │   └── products.csv
+│
 ├── src/
 │   └── catalog_normalizer/
 │       ├── __init__.py
+│       ├── config.py
 │       ├── models.py
 │       ├── normalizer.py
 │       ├── normalizers.py
 │       └── result.py
+│
 ├── tests/
-│    ├── test_normalizer.py
-│    └── test_normalizers.py
+│   ├── test_normalizer.py
+│   └── test_normalizers.py
+│
 ├── .gitignore
+├── LICENSE
 ├── pyproject.toml
 ├── README.md
 └── uv.lock
@@ -571,10 +1216,80 @@ catalog-normalizer/
 
 ---
 
+## Development Philosophy
+
+The core library should remain:
+
+- **Boring:** Favor understandable implementations over unnecessary complexity.
+- **Deterministic:** The same inputs and configuration should produce predictable results.
+- **Explicit:** Do not silently guess when data is ambiguous.
+- **Testable:** Important behaviors should be protected by automated tests.
+- **Trustworthy:** Preserve source information and make normalization failures visible.
+
+Normalization should not silently invent meaning.
+
+The goal is to transform unreliable external product data into predictable application input while exposing assumptions, corrections, and validation failures.
+
+---
+
 ## Long-Term Direction
 
-`catalog-normalizer` is intended to remain the deterministic normalization layer used by a larger Product & Inventory Sync SaaS.
+`catalog-normalizer` is intended to remain the deterministic normalization layer within a larger Product & Inventory Sync ecosystem.
 
-Commercial concerns such as authentication, multi-tenancy, persistence, asynchronous jobs, external integrations, billing, and customer-specific workflows will remain outside this package.
+The broader architecture is:
 
-This keeps the library reusable and its responsibilities clear.
+```text
+               Source Adapters
+        ┌──────────┼───────────┐
+       CSV     QuickBooks    Shopify
+        │           │            │
+        └───────────┼────────────┘
+                    ↓
+           Canonical Commerce Model
+                    ↓
+           Validation / Sync Engine
+                    ↓
+          Destination Adapters
+        ┌──────────┼────────────┐
+      Strapi    Shopify    WooCommerce
+```
+
+The responsibilities are intentionally separated.
+
+### catalog-normalizer
+
+An open-source Python library responsible for:
+
+- Field mapping
+- Data normalization
+- Canonical product validation
+- Structured errors and warnings
+- Processing results
+
+### product-hub
+
+A separate commercial application responsible for:
+
+- Source and destination adapters
+- Canonical data persistence
+- Product and inventory synchronization
+- Source-of-truth rules
+- Change detection and reconciliation
+- Background processing
+- Authentication and multi-tenancy
+- Operational visibility
+- Customer-specific workflows
+
+The two projects are designed to complement each other without coupling the public normalization library to a specific commercial application.
+
+---
+
+## License
+
+`catalog-normalizer` is released under the MIT License.
+
+See [LICENSE](LICENSE) for the full license text.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
